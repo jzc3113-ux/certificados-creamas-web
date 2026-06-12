@@ -50,15 +50,25 @@ Si el Excel tiene una sola hoja, la app la usa automáticamente. Si tiene varias
 4. Sube una plantilla PNG limpia.
 5. Opcionalmente, sube una o varias fuentes `.ttf` o `.otf`.
 6. Revisa o cambia el mapeo de columnas. Cualquier campo opcional puede quedar como “No usar”.
-7. Revisa la vista previa.
-8. Arrastra los campos en el canvas o ajusta manualmente X, Y, tamaño, color, ancho máximo, visibilidad, mayúsculas, alineación y fuente por campo.
-9. Opcionalmente, guarda la configuración en el navegador o descárgala como JSON para reutilizarla.
-10. Genera los certificados.
-11. Descarga el ZIP con todos los PDFs.
+7. Revisa la vista previa pequeña para ajustar posiciones.
+8. Usa **Ver vista previa en grande** para revisar el certificado completo antes de generar todos los PDFs.
+9. Arrastra los campos en el canvas o ajusta manualmente X, Y, tamaño, color, ancho máximo, visibilidad, mayúsculas, alineación y fuente por campo.
+10. Opcionalmente, guarda la configuración en el navegador o descárgala como JSON para reutilizarla.
+11. Genera los certificados.
+12. Descarga el ZIP con todos los PDFs.
 
 ## Fuentes
 
-Si no subes fuentes, la app usa una fuente segura del navegador y Helvetica como respaldo en PDF. Si subes fuentes, puedes elegir una fuente distinta por cada campo editable:
+Si no subes fuentes, la app usa fuentes seguras del navegador y fuentes integradas de jsPDF como respaldo. Si subes varias fuentes, cada campo puede usar una fuente distinta desde el selector **Fuente** del panel de edición.
+
+Recomendación usual:
+
+- `nombre_completo`: una fuente condensada o de titular, por ejemplo nombres parecidos a Nort, Headline, Cond o NortHeadline.
+- `texto_certificado`, `texto_gracias`, `fecha` y `codigo_certificado`: una fuente legible para cuerpo, por ejemplo nombres parecidos a Atkinson o Hyperlegible.
+
+La app intenta asignar automáticamente esas fuentes por nombre cuando las detecta. Siempre puedes cambiar la fuente manualmente por campo.
+
+Campos con selector de fuente:
 
 - `nombre_completo`
 - `texto_certificado`
@@ -71,6 +81,23 @@ Si una fuente falla al previsualizarse o al generarse en PDF, la app muestra un 
 ## Configuración JSON
 
 El JSON es una opción avanzada. La configuración exportada solo contiene posiciones, estilos, fuente asignada por campo y mapeo de columnas. No incluye Excel, PNG, archivos de fuente ni PDFs generados.
+
+La exportación incluye la fuente por campo en `fields` y también en `campos`, por ejemplo:
+
+```json
+{
+  "campos": {
+    "nombre_completo": {
+      "font": "NortHeadlineCond"
+    },
+    "texto_certificado": {
+      "font": "AtkinsonHyperlegible"
+    }
+  }
+}
+```
+
+Al cargar un JSON, si la fuente guardada ya fue subida por el usuario, se aplica automáticamente. Si no está disponible, la app avisa y usa una fuente de respaldo hasta que subas esa fuente.
 
 ## Publicación en GitHub Pages
 

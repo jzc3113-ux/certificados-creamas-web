@@ -11,17 +11,15 @@ const COLUMN_FIELDS = [
   { key: "correo", label: "Correo", aliases: ["correo", "email", "e_mail", "mail"] },
 ];
 
-const DEFAULT_FONT_ID = "browser-default";
-const DEFAULT_FONT = {
-  id: DEFAULT_FONT_ID,
-  label: "Fuente segura del navegador",
-  family: "Arial",
-  pdfName: "helvetica",
-  binary: "",
-  objectUrl: "",
-  loaded: true,
-  error: "",
-};
+const DEFAULT_FONT_ID = "browser-helvetica";
+const FALLBACK_FONTS = [
+  { id: DEFAULT_FONT_ID, label: "Respaldo navegador: Arial / Helvetica", family: "Arial", pdfName: "helvetica", binary: "", objectUrl: "", loaded: true, error: "", fallback: true },
+  { id: "browser-times", label: "Respaldo navegador: Times", family: "Times New Roman", pdfName: "times", binary: "", objectUrl: "", loaded: true, error: "", fallback: true },
+  { id: "browser-courier", label: "Respaldo navegador: Courier", family: "Courier New", pdfName: "courier", binary: "", objectUrl: "", loaded: true, error: "", fallback: true },
+];
+const DEFAULT_FONT = FALLBACK_FONTS[0];
+const TITLE_FONT_PATTERN = /(nort|headline|cond|northeadline)/i;
+const BODY_FONT_PATTERN = /(atkinson|hyperlegible)/i;
 
 const DEFAULT_CONFIG = {
   columnMap: {
@@ -51,7 +49,8 @@ const state = {
   templateImage: null,
   templateDataUrl: "",
   templateSize: { width: 1200, height: 850 },
-  fonts: [structuredClone(DEFAULT_FONT)],
+  fonts: structuredClone(FALLBACK_FONTS),
+  unavailableFonts: [],
   fontWarnings: [],
   config: structuredClone(DEFAULT_CONFIG),
   selectedField: "nombre_completo",
@@ -89,6 +88,14 @@ function cacheElements() {
     fieldTabs: document.getElementById("fieldTabs"),
     fieldEditor: document.getElementById("fieldEditor"),
     previewBtn: document.getElementById("previewBtn"),
+    largePreviewBtn: document.getElementById("largePreviewBtn"),
+    largePreviewBtnActions: document.getElementById("largePreviewBtnActions"),
+    previewModal: document.getElementById("previewModal"),
+    closePreviewBtn: document.getElementById("closePreviewBtn"),
+    largePreviewCanvas: document.getElementById("largePreviewCanvas"),
+    largePrevRecordBtn: document.getElementById("largePrevRecordBtn"),
+    largeNextRecordBtn: document.getElementById("largeNextRecordBtn"),
+    largeRecordIndicator: document.getElementById("largeRecordIndicator"),
     saveConfigBtn: document.getElementById("saveConfigBtn"),
     downloadConfigBtn: document.getElementById("downloadConfigBtn"),
     generateBtn: document.getElementById("generateBtn"),
@@ -107,7 +114,15 @@ function bindEvents() {
   els.fontInput.addEventListener("change", handleFontUpload);
   els.configInput.addEventListener("change", handleConfigUpload);
   els.sheetSelect.addEventListener("change", () => applyWorkbookSheet(els.sheetSelect.value));
-  els.previewBtn.addEventListener("click", drawPreview);
+  els.previewBtn.addEventListener("click", updatePreviewButton);
+  els.largePreviewBtn.addEventListener("click", openLargePreview);
+  els.largePreviewBtnActions.addEventListener("click", openLargePreview);
+  els.closePreviewBtn.addEventListener("click", closeLargePreview);
+  els.largePrevRecordBtn.addEventListener("click", () => moveRecord(-1));
+  els.largeNextRecordBtn.addEventListener("click", () => moveRecord(1));
+  els.previewModal.addEventListener("click", (event) => {
+    if (event.target === els.previewModal) closeLargePreview();
+  });
   els.saveConfigBtn.addEventListener("click", saveConfigToBrowser);
   els.downloadConfigBtn.addEventListener("click", downloadConfigJson);
   els.generateBtn.addEventListener("click", generateCertificates);
@@ -172,6 +187,8 @@ async function handleTemplateUpload(event) {
   state.templateSize = { width: state.templateImage.naturalWidth, height: state.templateImage.naturalHeight };
   els.previewCanvas.width = state.templateSize.width;
   els.previewCanvas.height = state.templateSize.height;
+  els.largePreviewCanvas.width = state.templateSize.width;
+  els.largePreviewCanvas.height = state.templateSize.height;
   updateStatus();
   drawPreview();
   setGenerationStatus(`Plantilla lista: ${state.templateSize.width} × ${state.templateSize.height}px.`);
@@ -188,6 +205,7 @@ async function handleFontUpload(event) {
     state.fonts.push(font);
   }
 
+  resolveSavedFontAssignments();
   autoAssignUploadedFonts(uploadedFonts);
   renderFieldEditor();
   updateStatus();
@@ -233,16 +251,26 @@ async function createFontFromFile(file) {
 
 function autoAssignUploadedFonts(uploadedFonts) {
   if (!uploadedFonts.length) return;
-  const firstUsable = uploadedFonts[0].id;
-  const secondUsable = uploadedFonts[1]?.id || firstUsable;
+  const titleFont = findFontByPattern(TITLE_FONT_PATTERN, uploadedFonts) || null;
+  const bodyFont = findFontByPattern(BODY_FONT_PATTERN, uploadedFonts) || null;
 
-  if (state.config.fields.nombre_completo.fontId === DEFAULT_FONT_ID) {
-    state.config.fields.nombre_completo.fontId = firstUsable;
+  if (titleFont && state.config.fields.nombre_completo.fontId === DEFAULT_FONT_ID) {
+    state.config.fields.nombre_completo.fontId = titleFont.id;
+    state.config.fields.nombre_completo.font = titleFont.label;
   }
 
-  ["texto_certificado", "texto_gracias", "fecha", "codigo_certificado"].forEach((key) => {
-    if (state.config.fields[key].fontId === DEFAULT_FONT_ID) state.config.fields[key].fontId = secondUsable;
-  });
+  if (bodyFont) {
+    ["texto_certificado", "texto_gracias", "fecha", "codigo_certificado"].forEach((key) => {
+      if (state.config.fields[key].fontId === DEFAULT_FONT_ID) {
+        state.config.fields[key].fontId = bodyFont.id;
+        state.config.fields[key].font = bodyFont.label;
+      }
+    });
+  }
+}
+
+function findFontByPattern(pattern, fonts = state.fonts) {
+  return fonts.find((font) => pattern.test(font.label) || pattern.test(font.id));
 }
 
 async function handleConfigUpload(event) {
@@ -255,7 +283,8 @@ async function handleConfigUpload(event) {
     renderFieldTabs();
     renderFieldEditor();
     drawPreview();
-    setGenerationStatus("Configuración JSON cargada. Recuerda que el JSON solo guarda posiciones, estilos, fuentes asignadas por nombre interno y columnas; no trae Excel ni PNG.");
+    const missingFonts = state.unavailableFonts.length ? ` Fuentes no disponibles: ${state.unavailableFonts.join(", ")}. Se usó respaldo hasta que subas esas fuentes.` : "";
+    setGenerationStatus(`Configuración JSON cargada. Recuerda que el JSON solo guarda posiciones, estilos, fuentes asignadas y columnas; no trae Excel ni PNG.${missingFonts}`, Boolean(state.unavailableFonts.length));
   } catch (error) {
     console.error(error);
     setGenerationStatus("No se pudo leer el JSON de configuración.", true);
@@ -284,6 +313,7 @@ function renderMappingControls() {
     select.addEventListener("change", () => {
       state.config.columnMap[field.key] = select.value;
       drawPreview();
+      drawLargePreview();
     });
     els.mappingGrid.appendChild(node);
   });
@@ -352,12 +382,35 @@ function updateSelectedFieldFromInput(event) {
   if (input.type === "checkbox") config[prop] = input.checked;
   else if (input.type === "number") config[prop] = Number(input.value || 0);
   else config[prop] = input.value;
+  if (prop === "fontId") config.font = getFontById(config.fontId).label;
   drawPreview();
+  drawLargePreview();
+}
+
+function updatePreviewButton() {
+  drawPreview();
+  drawLargePreview();
+  if (!state.rows.length || !state.templateDataUrl) {
+    setGenerationStatus("Sube primero un Excel y una plantilla PNG para generar la vista previa.", true);
+    return;
+  }
+  setGenerationStatus("Vista previa actualizada.");
 }
 
 function drawPreview() {
-  const ctx = els.previewCanvas.getContext("2d");
-  const { width, height } = els.previewCanvas;
+  drawCertificateToCanvas(els.previewCanvas, { showSelection: true });
+  updateRecordIndicator();
+}
+
+function drawLargePreview() {
+  if (!els.largePreviewCanvas || els.previewModal.hidden) return;
+  drawCertificateToCanvas(els.largePreviewCanvas, { showSelection: false });
+  updateRecordIndicator();
+}
+
+function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
+  const ctx = canvas.getContext("2d");
+  const { width, height } = canvas;
   ctx.clearRect(0, 0, width, height);
 
   if (state.templateImage) {
@@ -367,8 +420,27 @@ function drawPreview() {
   }
 
   const record = getCurrentRecord();
-  CERTIFICATE_FIELDS.forEach((field) => drawFieldOnCanvas(ctx, field.key, record));
-  updateRecordIndicator();
+  CERTIFICATE_FIELDS.forEach((field) => drawFieldOnCanvas(ctx, field.key, record, { showSelection }));
+}
+
+
+function openLargePreview() {
+  drawPreview();
+  if (!state.rows.length || !state.templateDataUrl) {
+    setGenerationStatus("Sube primero un Excel y una plantilla PNG para generar la vista previa.", true);
+    return;
+  }
+  els.largePreviewCanvas.width = state.templateSize.width;
+  els.largePreviewCanvas.height = state.templateSize.height;
+  els.previewModal.hidden = false;
+  document.body.classList.add("modal-open");
+  drawLargePreview();
+  setGenerationStatus("Vista previa grande actualizada.");
+}
+
+function closeLargePreview() {
+  els.previewModal.hidden = true;
+  document.body.classList.remove("modal-open");
 }
 
 function drawPlaceholderTemplate(ctx, width, height) {
@@ -383,10 +455,11 @@ function drawPlaceholderTemplate(ctx, width, height) {
   ctx.fillText("Sube una plantilla PNG", width / 2, 120);
 }
 
-function drawFieldOnCanvas(ctx, key, record) {
+function drawFieldOnCanvas(ctx, key, record, { showSelection = true } = {}) {
   const fieldConfig = state.config.fields[key];
   if (!fieldConfig.visible) return;
-  const text = getFieldText(key, record) || sampleText(key);
+  const text = getFieldText(key, record) || (state.rows.length ? "" : sampleText(key));
+  if (!text) return;
   const displayText = fieldConfig.uppercase ? text.toUpperCase() : text;
   const font = getFontById(fieldConfig.fontId);
   ctx.save();
@@ -396,7 +469,7 @@ function drawFieldOnCanvas(ctx, key, record) {
   ctx.textBaseline = "top";
   wrapCanvasText(ctx, displayText, fieldConfig.x, fieldConfig.y, fieldConfig.maxWidth, fieldConfig.size * 1.22);
 
-  if (key === state.selectedField) {
+  if (showSelection && key === state.selectedField) {
     ctx.strokeStyle = "rgba(46, 184, 114, 0.85)";
     ctx.lineWidth = 2;
     const startX = fieldConfig.align === "center" ? fieldConfig.x - fieldConfig.maxWidth / 2 : fieldConfig.align === "right" ? fieldConfig.x - fieldConfig.maxWidth : fieldConfig.x;
@@ -446,6 +519,7 @@ function startDrag(event) {
   renderFieldTabs();
   renderFieldEditor();
   drawPreview();
+  drawLargePreview();
 }
 
 function dragField(event) {
@@ -456,6 +530,7 @@ function dragField(event) {
   config.y = Math.round(point.y - state.drag.offsetY);
   renderFieldEditor();
   drawPreview();
+  drawLargePreview();
 }
 
 function endDrag() {
@@ -615,24 +690,69 @@ function downloadConfigJson() {
 }
 
 function exportableConfig() {
+  const fields = structuredClone(state.config.fields);
+  Object.entries(fields).forEach(([key, field]) => {
+    field.font = getFontById(field.fontId).label;
+    fields[key] = field;
+  });
+  const campos = Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, { ...field, font: field.font }]));
   return {
-    version: 2,
+    version: 3,
     note: "No incluye Excel, plantilla PNG, fuentes ni certificados. Solo posiciones, estilos, fuente asignada por campo y mapeo de columnas.",
     columnMap: state.config.columnMap,
-    fields: state.config.fields,
+    fields,
+    campos,
   };
 }
 
 function applyConfig(imported) {
   state.config = structuredClone(DEFAULT_CONFIG);
+  state.unavailableFonts = [];
+  const importedFields = imported?.fields || imported?.campos || {};
   if (imported?.columnMap) state.config.columnMap = { ...state.config.columnMap, ...imported.columnMap };
-  if (imported?.fields) {
-    Object.entries(imported.fields).forEach(([key, value]) => {
-      if (state.config.fields[key]) state.config.fields[key] = { ...state.config.fields[key], ...value };
-    });
-  }
+  Object.entries(importedFields).forEach(([key, value]) => {
+    if (!state.config.fields[key]) return;
+    state.config.fields[key] = { ...state.config.fields[key], ...value };
+    const savedFont = value.font || value.fontName || value.fontFamily || value.fontId;
+    if (savedFont) applySavedFontToField(key, savedFont);
+  });
   Object.values(state.config.fields).forEach((field) => {
-    if (!field.fontId) field.fontId = DEFAULT_FONT_ID;
+    if (!field.fontId || !fontExists(field.fontId)) field.fontId = DEFAULT_FONT_ID;
+    field.font = getFontById(field.fontId).label;
+  });
+}
+
+function applySavedFontToField(key, savedFont) {
+  const font = findFontBySavedName(savedFont);
+  if (font) {
+    state.config.fields[key].fontId = font.id;
+    state.config.fields[key].font = font.label;
+    delete state.config.fields[key].pendingFont;
+    return;
+  }
+  state.config.fields[key].fontId = DEFAULT_FONT_ID;
+  state.config.fields[key].font = getFontById(DEFAULT_FONT_ID).label;
+  state.config.fields[key].pendingFont = savedFont;
+  if (!state.unavailableFonts.includes(savedFont)) state.unavailableFonts.push(savedFont);
+}
+
+function resolveSavedFontAssignments() {
+  Object.entries(state.config.fields).forEach(([key, field]) => {
+    if (!field.pendingFont) return;
+    const font = findFontBySavedName(field.pendingFont);
+    if (!font) return;
+    field.fontId = font.id;
+    field.font = font.label;
+    state.unavailableFonts = state.unavailableFonts.filter((name) => name !== field.pendingFont);
+    delete field.pendingFont;
+  });
+}
+
+function findFontBySavedName(savedFont) {
+  const normalizedSaved = normalizeFontName(savedFont);
+  return state.fonts.find((font) => {
+    const candidates = [font.id, font.label, font.family, font.pdfName].map(normalizeFontName);
+    return candidates.includes(normalizedSaved);
   });
 }
 
@@ -640,6 +760,7 @@ function moveRecord(direction) {
   if (!state.rows.length) return;
   state.selectedRowIndex = (state.selectedRowIndex + direction + state.rows.length) % state.rows.length;
   drawPreview();
+  drawLargePreview();
 }
 
 function getCurrentRecord() {
@@ -663,14 +784,16 @@ function sampleText(key) {
 }
 
 function updateRecordIndicator() {
-  els.recordIndicator.textContent = state.rows.length ? `${state.selectedRowIndex + 1} / ${state.rows.length}` : "Sin datos";
+  const text = state.rows.length ? `${state.selectedRowIndex + 1} / ${state.rows.length}` : "Sin datos";
+  els.recordIndicator.textContent = text;
+  if (els.largeRecordIndicator) els.largeRecordIndicator.textContent = text;
 }
 
 function updateStatus() {
   const lines = [
     `Excel: ${state.rows.length ? `${state.rows.length} fila(s), ${state.headers.length} columna(s)${state.selectedSheetName ? ` · hoja “${state.selectedSheetName}”` : ""}` : "pendiente"}`,
     `Plantilla PNG: ${state.templateDataUrl ? `${state.templateSize.width} × ${state.templateSize.height}px` : "pendiente"}`,
-    `Fuentes: ${state.fonts.length > 1 ? `${state.fonts.length - 1} subida(s) + respaldo del navegador` : "respaldo seguro del navegador"}`,
+    `Fuentes: ${uploadedFontCount() ? `${uploadedFontCount()} subida(s) + respaldos del navegador` : "respaldos seguros del navegador"}`,
     "JSON: opcional, solo para recuperar posiciones y estilos anteriores.",
     "Privacidad: Excel, PNG, fuentes, JSON y PDFs se procesan localmente; no se guardan en GitHub.",
   ];
@@ -680,6 +803,10 @@ function updateStatus() {
 function setGenerationStatus(message, isError = false) {
   els.generationStatus.textContent = message;
   els.generationStatus.style.color = isError ? "#b42318" : "";
+}
+
+function uploadedFontCount() {
+  return state.fonts.filter((font) => !font.fallback).length;
 }
 
 function getFontById(id) {
@@ -698,6 +825,10 @@ function uniqueFontId(baseId) {
     suffix += 1;
   }
   return id;
+}
+
+function normalizeFontName(name) {
+  return normalizeHeader(name).replace(/^font_?/, "");
 }
 
 function normalizeHeader(header) {

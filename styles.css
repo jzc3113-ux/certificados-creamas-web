@@ -392,3 +392,68 @@ progress::-webkit-progress-value {
   background: #fff;
   color: var(--ink);
 }
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.preview-modal[hidden] {
+  display: none;
+}
+
+.preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(36, 48, 71, 0.72);
+}
+
+.preview-modal-card {
+  display: grid;
+  gap: 1rem;
+  width: min(96vw, 1280px);
+  max-height: 94vh;
+  padding: 1rem;
+  overflow: hidden;
+  border-radius: 1.4rem;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.preview-modal-header,
+.preview-modal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-modal-header h2 {
+  margin-bottom: 0.25rem;
+}
+
+.preview-modal-toolbar {
+  justify-content: center;
+}
+
+.large-preview-wrap {
+  overflow: auto;
+  max-height: 72vh;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #eef2f7;
+}
+
+#largePreviewCanvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(36, 48, 71, 0.18);
+}

@@ -85,6 +85,7 @@
             <button id="prevRecordBtn" class="secondary" type="button">Anterior</button>
             <span id="recordIndicator">Sin datos</span>
             <button id="nextRecordBtn" class="secondary" type="button">Siguiente</button>
+            <button id="largePreviewBtn" class="secondary" type="button">Ver vista previa en grande</button>
           </div>
         </div>
 
@@ -104,6 +105,7 @@
         <h2 id="acciones-title">4. Generación</h2>
         <div class="button-row">
           <button id="previewBtn" type="button">Generar vista previa</button>
+          <button id="largePreviewBtnActions" class="secondary" type="button">Ver vista previa en grande</button>
           <button id="saveConfigBtn" class="secondary" type="button">Guardar configuración opcional</button>
           <button id="downloadConfigBtn" class="secondary" type="button">Descargar JSON opcional</button>
           <button id="generateBtn" class="primary" type="button">Generar certificados</button>
@@ -114,6 +116,27 @@
         <p id="generationStatus" class="generation-status" aria-live="polite">Listo para empezar sin JSON.</p>
       </section>
     </main>
+
+    <div id="previewModal" class="preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="largePreviewTitle">
+      <div class="preview-modal-card">
+        <div class="preview-modal-header">
+          <div>
+            <p class="eyebrow">Vista previa local</p>
+            <h2 id="largePreviewTitle">Certificado completo</h2>
+            <p class="hint">Esta vista se genera en tu navegador y usa la misma plantilla, campos, estilos y fuentes que el PDF.</p>
+          </div>
+          <button id="closePreviewBtn" class="secondary" type="button">Cerrar</button>
+        </div>
+        <div class="preview-modal-toolbar">
+          <button id="largePrevRecordBtn" class="secondary" type="button">Anterior</button>
+          <span id="largeRecordIndicator">Sin datos</span>
+          <button id="largeNextRecordBtn" class="secondary" type="button">Siguiente</button>
+        </div>
+        <div class="large-preview-wrap">
+          <canvas id="largePreviewCanvas" width="1200" height="850" aria-label="Vista previa ampliada del certificado"></canvas>
+        </div>
+      </div>
+    </div>
 
     <template id="mappingTemplate">
       <label>
