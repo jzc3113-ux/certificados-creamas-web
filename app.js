@@ -1,10 +1,27 @@
-const REQUIRED_FIELDS = [
-  { key: "nombre_completo", label: "Nombre completo", aliases: ["nombre", "nombres", "participante", "nombre_completo"] },
+const CERTIFICATE_FIELDS = [
+  { key: "nombre_completo", label: "Nombre completo", aliases: ["nombre_completo", "nombre", "nombres", "participante"] },
   { key: "texto_certificado", label: "Texto certificado", aliases: ["texto_certificado", "texto_base", "texto", "cuerpo"] },
   { key: "texto_gracias", label: "Texto gracias", aliases: ["texto_gracias", "gracias", "agradecimiento"] },
   { key: "fecha", label: "Fecha", aliases: ["fecha", "date"] },
   { key: "codigo_certificado", label: "Código certificado", aliases: ["codigo_certificado", "codigo", "código", "code"] },
 ];
+
+const COLUMN_FIELDS = [
+  ...CERTIFICATE_FIELDS,
+  { key: "correo", label: "Correo", aliases: ["correo", "email", "e_mail", "mail"] },
+];
+
+const DEFAULT_FONT_ID = "browser-default";
+const DEFAULT_FONT = {
+  id: DEFAULT_FONT_ID,
+  label: "Fuente segura del navegador",
+  family: "Arial",
+  pdfName: "helvetica",
+  binary: "",
+  objectUrl: "",
+  loaded: true,
+  error: "",
+};
 
 const DEFAULT_CONFIG = {
   columnMap: {
@@ -13,24 +30,29 @@ const DEFAULT_CONFIG = {
     texto_gracias: "",
     fecha: "",
     codigo_certificado: "",
+    correo: "",
   },
   fields: {
-    nombre_completo: { x: 600, y: 330, size: 46, color: "#243047", maxWidth: 840, visible: true, uppercase: true, align: "center" },
-    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center" },
-    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center" },
-    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center" },
-    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right" },
+    nombre_completo: { x: 600, y: 330, size: 46, color: "#243047", maxWidth: 840, visible: true, uppercase: true, align: "center", fontId: DEFAULT_FONT_ID },
+    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
+    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
+    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
+    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right", fontId: DEFAULT_FONT_ID },
   },
 };
 
-const STORAGE_KEY = "creamas-certificados-config-v1";
+const STORAGE_KEY = "creamas-certificados-config-v2";
 const state = {
+  workbook: null,
+  sheetNames: [],
+  selectedSheetName: "",
   rows: [],
   headers: [],
   templateImage: null,
   templateDataUrl: "",
   templateSize: { width: 1200, height: 850 },
-  font: { name: "Helvetica", dataUrl: "", binary: "", objectUrl: "" },
+  fonts: [structuredClone(DEFAULT_FONT)],
+  fontWarnings: [],
   config: structuredClone(DEFAULT_CONFIG),
   selectedField: "nombre_completo",
   selectedRowIndex: 0,
@@ -44,6 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   restoreConfig();
   bindEvents();
+  renderSheetSelector();
   renderMappingControls();
   renderFieldTabs();
   renderFieldEditor();
@@ -58,6 +81,8 @@ function cacheElements() {
     fontInput: document.getElementById("fontInput"),
     configInput: document.getElementById("configInput"),
     fileStatus: document.getElementById("fileStatus"),
+    sheetPicker: document.getElementById("sheetPicker"),
+    sheetSelect: document.getElementById("sheetSelect"),
     mappingGrid: document.getElementById("mappingGrid"),
     mappingTemplate: document.getElementById("mappingTemplate"),
     previewCanvas: document.getElementById("previewCanvas"),
@@ -81,6 +106,7 @@ function bindEvents() {
   els.templateInput.addEventListener("change", handleTemplateUpload);
   els.fontInput.addEventListener("change", handleFontUpload);
   els.configInput.addEventListener("change", handleConfigUpload);
+  els.sheetSelect.addEventListener("change", () => applyWorkbookSheet(els.sheetSelect.value));
   els.previewBtn.addEventListener("click", drawPreview);
   els.saveConfigBtn.addEventListener("click", saveConfigToBrowser);
   els.downloadConfigBtn.addEventListener("click", downloadConfigJson);
@@ -98,18 +124,40 @@ function bindEvents() {
 async function handleExcelUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
-  setGenerationStatus("Leyendo Excel...");
+  setGenerationStatus("Leyendo Excel simple...");
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  state.rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "", raw: false });
+  state.workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  state.sheetNames = state.workbook.SheetNames || [];
+  const firstSheetName = state.sheetNames[0] || "";
+  applyWorkbookSheet(firstSheetName);
+  renderSheetSelector();
+  const sheetMessage = state.sheetNames.length > 1 ? ` Selecciona la hoja correcta si no es “${firstSheetName}”.` : "";
+  setGenerationStatus(`Excel listo: ${state.rows.length} fila(s) en “${firstSheetName}”.${sheetMessage}`);
+}
+
+function applyWorkbookSheet(sheetName) {
+  if (!state.workbook || !sheetName) return;
+  const sheet = state.workbook.Sheets[sheetName];
+  state.selectedSheetName = sheetName;
+  state.rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
   state.headers = Object.keys(state.rows[0] || {});
   state.selectedRowIndex = 0;
   autoMapColumns();
   renderMappingControls();
   updateStatus();
   drawPreview();
-  setGenerationStatus(`Excel listo: ${state.rows.length} fila(s).`);
+}
+
+function renderSheetSelector() {
+  if (!els.sheetPicker || !els.sheetSelect) return;
+  if (state.sheetNames.length <= 1) {
+    els.sheetPicker.hidden = true;
+    els.sheetSelect.innerHTML = "";
+    return;
+  }
+  els.sheetPicker.hidden = false;
+  els.sheetSelect.innerHTML = state.sheetNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  els.sheetSelect.value = state.selectedSheetName;
 }
 
 async function handleTemplateUpload(event) {
@@ -130,27 +178,71 @@ async function handleTemplateUpload(event) {
 }
 
 async function handleFontUpload(event) {
-  const [file] = event.target.files;
-  if (!file) return;
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+
+  const uploadedFonts = [];
+  for (const file of files) {
+    const font = await createFontFromFile(file);
+    uploadedFonts.push(font);
+    state.fonts.push(font);
+  }
+
+  autoAssignUploadedFonts(uploadedFonts);
+  renderFieldEditor();
+  updateStatus();
+  drawPreview();
+
+  const failed = uploadedFonts.filter((font) => !font.loaded);
+  if (failed.length) {
+    setGenerationStatus(`Se cargaron ${uploadedFonts.length - failed.length} fuente(s). ${failed.length} fuente(s) no pudieron previsualizarse y usarán respaldo si fallan en PDF.`, true);
+  } else {
+    setGenerationStatus(`Fuente(s) cargada(s): ${uploadedFonts.map((font) => font.label).join(", ")}. Puedes elegir una fuente por campo.`);
+  }
+}
+
+async function createFontFromFile(file) {
   const buffer = await file.arrayBuffer();
   const binary = arrayBufferToBinary(buffer);
   const objectUrl = URL.createObjectURL(file);
-  const familyName = `CreaMasFont${Date.now()}`;
-
-  if (state.font.objectUrl) URL.revokeObjectURL(state.font.objectUrl);
-  state.font = { name: familyName, dataUrl: await readAsDataUrl(file), binary, objectUrl };
+  const label = file.name.replace(/\.(ttf|otf)$/i, "");
+  const id = uniqueFontId(`font-${normalizeHeader(label) || Date.now()}`);
+  const font = {
+    id,
+    label,
+    family: `CreaMasFont_${id.replace(/[^a-zA-Z0-9_]/g, "_")}`,
+    pdfName: `CreaMasPdf_${id.replace(/[^a-zA-Z0-9_]/g, "_")}`,
+    binary,
+    objectUrl,
+    loaded: false,
+    error: "",
+  };
 
   try {
-    const fontFace = new FontFace(familyName, `url(${objectUrl})`);
+    const fontFace = new FontFace(font.family, `url(${objectUrl})`);
     await fontFace.load();
     document.fonts.add(fontFace);
-    setGenerationStatus("Fuente cargada correctamente.");
+    font.loaded = true;
   } catch (error) {
-    console.warn(error);
-    setGenerationStatus("La fuente se usará en el PDF, pero el navegador no pudo previsualizarla.", true);
+    console.warn(`No se pudo previsualizar la fuente ${file.name}`, error);
+    font.error = "No se pudo previsualizar en el navegador.";
   }
-  updateStatus();
-  drawPreview();
+
+  return font;
+}
+
+function autoAssignUploadedFonts(uploadedFonts) {
+  if (!uploadedFonts.length) return;
+  const firstUsable = uploadedFonts[0].id;
+  const secondUsable = uploadedFonts[1]?.id || firstUsable;
+
+  if (state.config.fields.nombre_completo.fontId === DEFAULT_FONT_ID) {
+    state.config.fields.nombre_completo.fontId = firstUsable;
+  }
+
+  ["texto_certificado", "texto_gracias", "fecha", "codigo_certificado"].forEach((key) => {
+    if (state.config.fields[key].fontId === DEFAULT_FONT_ID) state.config.fields[key].fontId = secondUsable;
+  });
 }
 
 async function handleConfigUpload(event) {
@@ -163,7 +255,7 @@ async function handleConfigUpload(event) {
     renderFieldTabs();
     renderFieldEditor();
     drawPreview();
-    setGenerationStatus("Configuración JSON cargada.");
+    setGenerationStatus("Configuración JSON cargada. Recuerda que el JSON solo guarda posiciones, estilos, fuentes asignadas por nombre interno y columnas; no trae Excel ni PNG.");
   } catch (error) {
     console.error(error);
     setGenerationStatus("No se pudo leer el JSON de configuración.", true);
@@ -171,16 +263,18 @@ async function handleConfigUpload(event) {
 }
 
 function autoMapColumns() {
-  for (const field of REQUIRED_FIELDS) {
-    if (state.config.columnMap[field.key] && state.headers.includes(state.config.columnMap[field.key])) continue;
+  for (const field of COLUMN_FIELDS) {
+    const currentColumn = state.config.columnMap[field.key];
+    if (currentColumn && state.headers.includes(currentColumn)) continue;
     const match = state.headers.find((header) => field.aliases.includes(normalizeHeader(header)));
     state.config.columnMap[field.key] = match || "";
   }
 }
 
 function renderMappingControls() {
+  if (!els.mappingGrid || !els.mappingTemplate) return;
   els.mappingGrid.innerHTML = "";
-  REQUIRED_FIELDS.forEach((field) => {
+  COLUMN_FIELDS.forEach((field) => {
     const node = els.mappingTemplate.content.firstElementChild.cloneNode(true);
     const label = node.querySelector("span");
     const select = node.querySelector("select");
@@ -197,7 +291,7 @@ function renderMappingControls() {
 
 function renderFieldTabs() {
   els.fieldTabs.innerHTML = "";
-  REQUIRED_FIELDS.forEach((field) => {
+  CERTIFICATE_FIELDS.forEach((field) => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = field.label;
@@ -214,9 +308,10 @@ function renderFieldTabs() {
 
 function renderFieldEditor() {
   const config = state.config.fields[state.selectedField];
-  const fieldLabel = REQUIRED_FIELDS.find((field) => field.key === state.selectedField)?.label || state.selectedField;
+  const fieldLabel = CERTIFICATE_FIELDS.find((field) => field.key === state.selectedField)?.label || state.selectedField;
   els.fieldEditor.innerHTML = `
     <label><span>Campo</span><input value="${escapeHtml(fieldLabel)}" disabled></label>
+    <label><span>Fuente</span><select data-prop="fontId">${fontOptionsHtml()}</select></label>
     <div class="inline">
       ${numberInput("X", "x", config.x)}
       ${numberInput("Y", "y", config.y)}
@@ -234,11 +329,16 @@ function renderFieldEditor() {
     <label class="checkbox-row"><input data-prop="visible" type="checkbox" ${config.visible ? "checked" : ""}> Visible</label>
     <label class="checkbox-row"><input data-prop="uppercase" type="checkbox" ${config.uppercase ? "checked" : ""}> Mayúsculas</label>
   `;
+  els.fieldEditor.querySelector('[data-prop="fontId"]').value = fontExists(config.fontId) ? config.fontId : DEFAULT_FONT_ID;
   els.fieldEditor.querySelector('[data-prop="align"]').value = config.align;
   els.fieldEditor.querySelectorAll("[data-prop]").forEach((input) => {
     input.addEventListener("input", updateSelectedFieldFromInput);
     input.addEventListener("change", updateSelectedFieldFromInput);
   });
+}
+
+function fontOptionsHtml() {
+  return state.fonts.map((font) => `<option value="${escapeHtml(font.id)}">${escapeHtml(font.label)}${font.error ? " (respaldo si falla)" : ""}</option>`).join("");
 }
 
 function numberInput(label, prop, value) {
@@ -267,7 +367,7 @@ function drawPreview() {
   }
 
   const record = getCurrentRecord();
-  REQUIRED_FIELDS.forEach((field) => drawFieldOnCanvas(ctx, field.key, record));
+  CERTIFICATE_FIELDS.forEach((field) => drawFieldOnCanvas(ctx, field.key, record));
   updateRecordIndicator();
 }
 
@@ -288,9 +388,10 @@ function drawFieldOnCanvas(ctx, key, record) {
   if (!fieldConfig.visible) return;
   const text = getFieldText(key, record) || sampleText(key);
   const displayText = fieldConfig.uppercase ? text.toUpperCase() : text;
+  const font = getFontById(fieldConfig.fontId);
   ctx.save();
   ctx.fillStyle = fieldConfig.color;
-  ctx.font = `${key === "nombre_completo" ? "700" : "400"} ${fieldConfig.size}px "${state.font.name}", Helvetica, Arial, sans-serif`;
+  ctx.font = `${key === "nombre_completo" ? "700" : "400"} ${fieldConfig.size}px "${font.family}", Arial, Helvetica, sans-serif`;
   ctx.textAlign = fieldConfig.align;
   ctx.textBaseline = "top";
   wrapCanvasText(ctx, displayText, fieldConfig.x, fieldConfig.y, fieldConfig.maxWidth, fieldConfig.size * 1.22);
@@ -363,7 +464,7 @@ function endDrag() {
 }
 
 function hitTestField(point) {
-  return [...REQUIRED_FIELDS].reverse().find((field) => {
+  return [...CERTIFICATE_FIELDS].reverse().find((field) => {
     const config = state.config.fields[field.key];
     if (!config.visible) return false;
     const x = config.align === "center" ? config.x - config.maxWidth / 2 : config.align === "right" ? config.x - config.maxWidth : config.x;
@@ -380,6 +481,7 @@ async function generateCertificates() {
   state.zipBlob = null;
   els.progressBar.value = 0;
   const zip = new JSZip();
+  state.fontWarnings = [];
 
   try {
     for (let index = 0; index < state.rows.length; index += 1) {
@@ -398,7 +500,8 @@ async function generateCertificates() {
     });
     els.progressBar.value = 100;
     els.downloadZipBtn.disabled = false;
-    setGenerationStatus(`ZIP listo con ${state.rows.length} certificado(s).`);
+    const warningText = state.fontWarnings.length ? ` Aviso: ${state.fontWarnings.join(" ")}` : "";
+    setGenerationStatus(`ZIP listo con ${state.rows.length} certificado(s).${warningText}`, Boolean(state.fontWarnings.length));
   } catch (error) {
     console.error(error);
     setGenerationStatus("Ocurrió un error al generar los certificados.", true);
@@ -413,15 +516,25 @@ async function createPdfForRecord(record) {
   const orientation = width >= height ? "landscape" : "portrait";
   const pdf = new jsPDF({ orientation, unit: "px", format: [width, height], compress: true });
   pdf.addImage(state.templateDataUrl, "PNG", 0, 0, width, height);
-
-  if (state.font.binary) {
-    pdf.addFileToVFS("creamas-font.ttf", btoa(state.font.binary));
-    pdf.addFont("creamas-font.ttf", "CreaMasFont", "normal");
-    pdf.addFont("creamas-font.ttf", "CreaMasFont", "bold");
-  }
-
-  REQUIRED_FIELDS.forEach((field) => addFieldToPdf(pdf, field.key, record));
+  registerFontsInPdf(pdf);
+  CERTIFICATE_FIELDS.forEach((field) => addFieldToPdf(pdf, field.key, record));
   return pdf.output("blob");
+}
+
+function registerFontsInPdf(pdf) {
+  state.fonts.forEach((font) => {
+    if (!font.binary) return;
+    try {
+      const fileName = `${font.pdfName}.ttf`;
+      pdf.addFileToVFS(fileName, btoa(font.binary));
+      pdf.addFont(fileName, font.pdfName, "normal");
+      pdf.addFont(fileName, font.pdfName, "bold");
+    } catch (error) {
+      console.warn(`No se pudo registrar la fuente ${font.label} en el PDF`, error);
+      font.error = "No se pudo usar en PDF.";
+      addFontWarning(`La fuente “${font.label}” falló en PDF y se usó Helvetica.`);
+    }
+  });
 }
 
 function addFieldToPdf(pdf, key, record) {
@@ -430,8 +543,18 @@ function addFieldToPdf(pdf, key, record) {
   const text = getFieldText(key, record);
   if (!text) return;
   const displayText = config.uppercase ? text.toUpperCase() : text;
-  const fontName = state.font.binary ? "CreaMasFont" : "helvetica";
-  pdf.setFont(fontName, key === "nombre_completo" ? "bold" : "normal");
+  const font = getFontById(config.fontId);
+  const fontStyle = key === "nombre_completo" ? "bold" : "normal";
+  const fontName = getPdfFontName(font);
+
+  try {
+    pdf.setFont(fontName, fontStyle);
+  } catch (error) {
+    console.warn(`No se pudo aplicar la fuente ${font.label}; se usará Helvetica`, error);
+    addFontWarning(`La fuente “${font.label}” no se pudo aplicar y se usó Helvetica.`);
+    pdf.setFont("helvetica", fontStyle);
+  }
+
   pdf.setFontSize(config.size);
   pdf.setTextColor(config.color);
 
@@ -440,6 +563,14 @@ function addFieldToPdf(pdf, key, record) {
   lines.forEach((line, index) => {
     pdf.text(line, config.x, config.y + index * lineHeight, { align: config.align, baseline: "top" });
   });
+}
+
+function getPdfFontName(font) {
+  return font?.binary && !font.error ? font.pdfName : "helvetica";
+}
+
+function addFontWarning(message) {
+  if (!state.fontWarnings.includes(message)) state.fontWarnings.push(message);
 }
 
 function validateBeforeGenerate() {
@@ -453,7 +584,7 @@ function validateBeforeGenerate() {
   }
   const missing = ["nombre_completo", "texto_certificado", "fecha", "codigo_certificado"].filter((key) => !state.config.columnMap[key]);
   if (missing.length) {
-    setGenerationStatus(`Faltan columnas obligatorias: ${missing.join(", ")}.`, true);
+    setGenerationStatus(`Faltan columnas obligatorias: ${missing.join(", ")}. Puedes seleccionar “No usar” solo para campos opcionales como texto_gracias o correo.`, true);
     return false;
   }
   return true;
@@ -466,7 +597,7 @@ function downloadZip() {
 
 function saveConfigToBrowser() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(exportableConfig()));
-  setGenerationStatus("Configuración guardada en este navegador.");
+  setGenerationStatus("Configuración guardada en este navegador. No se guardaron Excel, PNG, fuentes ni PDFs.");
 }
 
 function restoreConfig() {
@@ -485,8 +616,8 @@ function downloadConfigJson() {
 
 function exportableConfig() {
   return {
-    version: 1,
-    note: "No incluye Excel, plantilla PNG, fuente ni certificados. Solo posiciones, estilos y mapeo de columnas.",
+    version: 2,
+    note: "No incluye Excel, plantilla PNG, fuentes ni certificados. Solo posiciones, estilos, fuente asignada por campo y mapeo de columnas.",
     columnMap: state.config.columnMap,
     fields: state.config.fields,
   };
@@ -500,6 +631,9 @@ function applyConfig(imported) {
       if (state.config.fields[key]) state.config.fields[key] = { ...state.config.fields[key], ...value };
     });
   }
+  Object.values(state.config.fields).forEach((field) => {
+    if (!field.fontId) field.fontId = DEFAULT_FONT_ID;
+  });
 }
 
 function moveRecord(direction) {
@@ -534,10 +668,11 @@ function updateRecordIndicator() {
 
 function updateStatus() {
   const lines = [
-    `Excel: ${state.rows.length ? `${state.rows.length} fila(s), ${state.headers.length} columna(s)` : "pendiente"}`,
+    `Excel: ${state.rows.length ? `${state.rows.length} fila(s), ${state.headers.length} columna(s)${state.selectedSheetName ? ` · hoja “${state.selectedSheetName}”` : ""}` : "pendiente"}`,
     `Plantilla PNG: ${state.templateDataUrl ? `${state.templateSize.width} × ${state.templateSize.height}px` : "pendiente"}`,
-    `Fuente: ${state.font.binary ? "personalizada" : "predeterminada"}`,
-    "Privacidad: los archivos se procesan localmente en este navegador.",
+    `Fuentes: ${state.fonts.length > 1 ? `${state.fonts.length - 1} subida(s) + respaldo del navegador` : "respaldo seguro del navegador"}`,
+    "JSON: opcional, solo para recuperar posiciones y estilos anteriores.",
+    "Privacidad: Excel, PNG, fuentes, JSON y PDFs se procesan localmente; no se guardan en GitHub.",
   ];
   els.fileStatus.innerHTML = lines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
 }
@@ -545,6 +680,24 @@ function updateStatus() {
 function setGenerationStatus(message, isError = false) {
   els.generationStatus.textContent = message;
   els.generationStatus.style.color = isError ? "#b42318" : "";
+}
+
+function getFontById(id) {
+  return state.fonts.find((font) => font.id === id) || state.fonts[0] || DEFAULT_FONT;
+}
+
+function fontExists(id) {
+  return state.fonts.some((font) => font.id === id);
+}
+
+function uniqueFontId(baseId) {
+  let id = baseId;
+  let suffix = 2;
+  while (fontExists(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  return id;
 }
 
 function normalizeHeader(header) {

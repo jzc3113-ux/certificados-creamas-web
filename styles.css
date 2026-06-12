@@ -357,3 +357,38 @@ progress::-webkit-progress-value {
     width: 100%;
   }
 }
+
+.flow-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-list li {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: #fff3cf;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.sheet-picker {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 24rem;
+  margin: 1rem 0;
+  font-weight: 800;
+}
+
+.sheet-picker select {
+  min-height: 2.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--ink);
+}

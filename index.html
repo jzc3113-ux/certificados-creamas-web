@@ -17,7 +17,7 @@
         <p class="eyebrow">Crea+ · herramienta local</p>
         <h1>Generador web de certificados</h1>
         <p>
-          Sube tu Excel y una plantilla PNG limpia para crear certificados PDF desde el navegador.
+          Flujo simple: 1 Excel, 1 plantilla PNG limpia y textos variables en columnas directas.
           Los archivos se procesan localmente en tu equipo: no se suben a ningún servidor ni se guardan en GitHub.
         </p>
       </div>
@@ -42,22 +42,36 @@
             <input id="templateInput" type="file" accept="image/png" />
           </label>
           <label class="upload-box optional">
-            <span>Subir fuente</span>
-            <small>Opcional: .ttf u .otf</small>
-            <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf" />
+            <span>Subir fuentes opcionales</span>
+            <small>Puedes subir una para títulos y otra para textos</small>
+            <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf" multiple />
           </label>
           <label class="upload-box optional">
-            <span>Cargar configuración JSON</span>
-            <small>Recupera posiciones y estilos</small>
+            <span>Cargar JSON opcional</span>
+            <small>Solo para recuperar posiciones y estilos anteriores</small>
             <input id="configInput" type="file" accept="application/json,.json" />
           </label>
         </div>
         <div id="fileStatus" class="status-list" aria-live="polite"></div>
+        <ol class="flow-list" aria-label="Flujo principal">
+          <li>Subir Excel</li>
+          <li>Subir plantilla PNG</li>
+          <li>Subir fuentes opcionales</li>
+          <li>Mapear columnas</li>
+          <li>Ajustar campos</li>
+          <li>Generar vista previa</li>
+          <li>Generar certificados</li>
+          <li>Descargar ZIP</li>
+        </ol>
       </section>
 
       <section class="panel" aria-labelledby="columnas-title">
         <h2 id="columnas-title">2. Columnas del Excel</h2>
-        <p class="hint">Selecciona qué columna alimenta cada campo del certificado. La primera fila del Excel debe contener encabezados.</p>
+        <p class="hint">La app espera columnas directas como nombre_completo, texto_certificado, texto_gracias, fecha, codigo_certificado y correo. Puedes cambiar cualquier asignación o elegir “No usar”.</p>
+        <label id="sheetPicker" class="sheet-picker" hidden>
+          <span>Hoja del Excel</span>
+          <select id="sheetSelect"></select>
+        </label>
         <div id="mappingGrid" class="mapping-grid"></div>
       </section>
 
@@ -65,7 +79,7 @@
         <div class="panel-title-row">
           <div>
             <h2 id="editor-title">3. Vista previa y ajustes</h2>
-            <p class="hint">Arrastra un campo sobre la vista previa o edita sus valores manualmente.</p>
+            <p class="hint">Arrastra un campo sobre la vista previa o edita X, Y, tamaño, color, ancho, alineación, visibilidad, mayúsculas y fuente por campo.</p>
           </div>
           <div class="preview-actions">
             <button id="prevRecordBtn" class="secondary" type="button">Anterior</button>
@@ -90,13 +104,14 @@
         <h2 id="acciones-title">4. Generación</h2>
         <div class="button-row">
           <button id="previewBtn" type="button">Generar vista previa</button>
-          <button id="saveConfigBtn" class="secondary" type="button">Guardar configuración</button>
-          <button id="downloadConfigBtn" class="secondary" type="button">Descargar JSON</button>
+          <button id="saveConfigBtn" class="secondary" type="button">Guardar configuración opcional</button>
+          <button id="downloadConfigBtn" class="secondary" type="button">Descargar JSON opcional</button>
           <button id="generateBtn" class="primary" type="button">Generar certificados</button>
           <button id="downloadZipBtn" class="success" type="button" disabled>Descargar ZIP</button>
         </div>
         <progress id="progressBar" max="100" value="0"></progress>
-        <p id="generationStatus" class="generation-status" aria-live="polite">Listo para empezar.</p>
+        <p class="hint">Usa JSON solo si quieres recuperar una configuración anterior de posiciones y estilos. Puedes generar certificados sin cargar JSON.</p>
+        <p id="generationStatus" class="generation-status" aria-live="polite">Listo para empezar sin JSON.</p>
       </section>
     </main>
 
