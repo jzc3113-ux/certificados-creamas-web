@@ -1,0 +1,394 @@
+:root {
+  --cream: #fff7e7;
+  --gold: #ffbd32;
+  --gold-dark: #d99000;
+  --ink: #243047;
+  --muted: #697386;
+  --line: #e6dfd2;
+  --card: #ffffff;
+  --green: #2eb872;
+  --shadow: 0 18px 45px rgba(36, 48, 71, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #fff1c6 0, transparent 28rem), linear-gradient(135deg, var(--cream), #f8fbff);
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 1rem;
+  padding: 0.9rem 1.25rem;
+  min-height: 3rem;
+  color: var(--ink);
+  background: var(--gold);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 0 var(--gold-dark);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 var(--gold-dark);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button.secondary {
+  background: #edf2ff;
+  box-shadow: 0 8px 0 #cbd7ff;
+}
+
+button.success {
+  color: #fff;
+  background: var(--green);
+  box-shadow: 0 8px 0 #17894d;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 2rem;
+  align-items: center;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 1.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--gold-dark);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0.75rem;
+  font-size: clamp(2.2rem, 5vw, 4.7rem);
+  line-height: 0.95;
+}
+
+.hero p:not(.eyebrow) {
+  max-width: 56rem;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
+
+.privacy-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  border: 2px solid rgba(255, 189, 50, 0.55);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow);
+}
+
+.privacy-card strong {
+  font-size: 1.35rem;
+}
+
+.privacy-card span,
+.hint,
+.status-list,
+.generation-status,
+small {
+  color: var(--muted);
+}
+
+.layout {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 3rem;
+}
+
+.panel {
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.panel h2 {
+  margin-bottom: 0.35rem;
+}
+
+.upload-grid,
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.upload-box {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 9rem;
+  align-content: center;
+  padding: 1rem;
+  border: 2px dashed #f0c96b;
+  border-radius: 1.2rem;
+  background: #fffaf0;
+  cursor: pointer;
+  text-align: center;
+}
+
+.upload-box span {
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.upload-box.optional {
+  background: #f7f9ff;
+  border-color: #cdd8ff;
+}
+
+.upload-box input {
+  width: 100%;
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.status-list {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.mapping-grid label,
+.field-editor label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 800;
+}
+
+.mapping-grid select,
+.field-editor input,
+.field-editor select {
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.panel-title-row,
+.preview-actions,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-actions {
+  justify-content: flex-end;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 1rem;
+  align-items: start;
+}
+
+.preview-wrap {
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #eef2f7;
+}
+
+#previewCanvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(36, 48, 71, 0.18);
+  cursor: grab;
+}
+
+#previewCanvas.dragging {
+  cursor: grabbing;
+}
+
+.field-settings {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.field-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.field-tabs button {
+  min-height: auto;
+  padding: 0.65rem;
+  border-radius: 0.75rem;
+  background: #f6f7fb;
+  box-shadow: none;
+  font-size: 0.86rem;
+}
+
+.field-tabs button.active {
+  background: var(--gold);
+}
+
+.field-editor {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.field-editor .inline {
+  grid-template-columns: 1fr 1fr;
+}
+
+.checkbox-row {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 0.65rem !important;
+}
+
+.checkbox-row input {
+  width: auto;
+  min-height: auto;
+}
+
+.actions-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.button-row {
+  justify-content: flex-start;
+}
+
+progress {
+  width: 100%;
+  height: 1rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+}
+
+progress::-webkit-progress-bar {
+  background: #edf2ff;
+}
+
+progress::-webkit-progress-value {
+  background: var(--green);
+}
+
+@media (max-width: 980px) {
+  .hero,
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-grid,
+  .mapping-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-settings {
+    position: static;
+  }
+}
+
+@media (max-width: 620px) {
+  .upload-grid,
+  .mapping-grid,
+  .field-editor .inline {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .hero,
+  .layout {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  button {
+    width: 100%;
+  }
+}
+
+.flow-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-list li {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: #fff3cf;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.sheet-picker {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 24rem;
+  margin: 1rem 0;
+  font-weight: 800;
+}
+
+.sheet-picker select {
+  min-height: 2.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--ink);
+}
