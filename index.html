@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Generador de certificados Crea+</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Crea+ · herramienta local</p>
+        <h1>Generador web de certificados</h1>
+        <p>
+          Flujo simple: 1 Excel, 1 plantilla PNG limpia y textos variables en columnas directas.
+          Los archivos se procesan localmente en tu equipo: no se suben a ningún servidor ni se guardan en GitHub.
+        </p>
+      </div>
+      <div class="privacy-card" aria-label="Aviso de privacidad">
+        <strong>100% en navegador</strong>
+        <span>Excel, plantillas, fuentes y PDFs permanecen en tu computadora.</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel steps-panel" aria-labelledby="pasos-title">
+        <h2 id="pasos-title">1. Carga de archivos</h2>
+        <div class="upload-grid">
+          <label class="upload-box">
+            <span>Subir Excel</span>
+            <small>.xlsx, .xls o .csv</small>
+            <input id="excelInput" type="file" accept=".xlsx,.xls,.csv" />
+          </label>
+          <label class="upload-box">
+            <span>Subir plantilla PNG</span>
+            <small>Diseño limpio sin datos personales</small>
+            <input id="templateInput" type="file" accept="image/png" />
+          </label>
+          <label class="upload-box optional">
+            <span>Subir fuentes opcionales</span>
+            <small>Puedes subir una para títulos y otra para textos</small>
+            <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf" multiple />
+          </label>
+          <label class="upload-box optional">
+            <span>Cargar JSON opcional</span>
+            <small>Solo para recuperar posiciones y estilos anteriores</small>
+            <input id="configInput" type="file" accept="application/json,.json" />
+          </label>
+        </div>
+        <div id="fileStatus" class="status-list" aria-live="polite"></div>
+        <ol class="flow-list" aria-label="Flujo principal">
+          <li>Subir Excel</li>
+          <li>Subir plantilla PNG</li>
+          <li>Subir fuentes opcionales</li>
+          <li>Mapear columnas</li>
+          <li>Ajustar campos</li>
+          <li>Generar vista previa</li>
+          <li>Generar certificados</li>
+          <li>Descargar ZIP</li>
+        </ol>
+      </section>
+
+      <section class="panel" aria-labelledby="columnas-title">
+        <h2 id="columnas-title">2. Columnas del Excel</h2>
+        <p class="hint">La app espera columnas directas como nombre_completo, texto_certificado, texto_gracias, fecha, codigo_certificado y correo. Puedes cambiar cualquier asignación o elegir “No usar”.</p>
+        <label id="sheetPicker" class="sheet-picker" hidden>
+          <span>Hoja del Excel</span>
+          <select id="sheetSelect"></select>
+        </label>
+        <div id="mappingGrid" class="mapping-grid"></div>
+      </section>
+
+      <section class="panel editor-panel" aria-labelledby="editor-title">
+        <div class="panel-title-row">
+          <div>
+            <h2 id="editor-title">3. Vista previa y ajustes</h2>
+            <p class="hint">Arrastra un campo sobre la vista previa o edita X, Y, tamaño, color, ancho, alineación, visibilidad, mayúsculas y fuente por campo.</p>
+          </div>
+          <div class="preview-actions">
+            <button id="prevRecordBtn" class="secondary" type="button">Anterior</button>
+            <span id="recordIndicator">Sin datos</span>
+            <button id="nextRecordBtn" class="secondary" type="button">Siguiente</button>
+            <button id="largePreviewBtn" class="secondary" type="button">Ver vista previa en grande</button>
+          </div>
+        </div>
+
+        <div class="editor-grid">
+          <div class="preview-wrap">
+            <canvas id="previewCanvas" width="1200" height="850" aria-label="Vista previa del certificado"></canvas>
+          </div>
+          <aside class="field-settings" aria-labelledby="campos-title">
+            <h3 id="campos-title">Campos editables</h3>
+            <div id="fieldTabs" class="field-tabs"></div>
+            <div id="fieldEditor" class="field-editor"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel actions-panel" aria-labelledby="acciones-title">
+        <h2 id="acciones-title">4. Generación</h2>
+        <div class="button-row">
+          <button id="previewBtn" type="button">Generar vista previa</button>
+          <button id="largePreviewBtnActions" class="secondary" type="button">Ver vista previa en grande</button>
+          <button id="saveConfigBtn" class="secondary" type="button">Guardar configuración opcional</button>
+          <button id="downloadConfigBtn" class="secondary" type="button">Descargar JSON opcional</button>
+          <button id="generateBtn" class="primary" type="button">Generar certificados</button>
+          <button id="downloadZipBtn" class="success" type="button" disabled>Descargar ZIP</button>
+          <button id="newBatchBtn" class="secondary" type="button">Nuevo lote</button>
+          <button id="resetAllBtn" class="secondary danger" type="button">Reiniciar todo</button>
+        </div>
+        <progress id="progressBar" max="100" value="0"></progress>
+        <p class="hint">Usa JSON solo si quieres recuperar una configuración anterior de posiciones y estilos. Puedes generar certificados sin cargar JSON.</p>
+        <p class="hint">Para poner una parte del texto en negrita, escribe el texto entre doble asterisco en el Excel. Ejemplo: <strong>**texto importante**</strong>.</p>
+        <p id="generationStatus" class="generation-status" aria-live="polite">Listo para empezar sin JSON.</p>
+      </section>
+    </main>
+
+    <div id="previewModal" class="preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="largePreviewTitle">
+      <div class="preview-modal-card">
+        <div class="preview-modal-header">
+          <div>
+            <p class="eyebrow">Vista previa local</p>
+            <h2 id="largePreviewTitle">Certificado completo</h2>
+            <p class="hint">Esta vista se genera en tu navegador y usa la misma plantilla, campos, estilos y fuentes que el PDF.</p>
+          </div>
+          <button id="closePreviewBtn" class="modal-close" type="button" aria-label="Cerrar vista previa">×</button>
+        </div>
+        <div class="preview-modal-toolbar">
+          <button id="largePrevRecordBtn" class="secondary" type="button">Anterior</button>
+          <span id="largeRecordIndicator">Sin datos</span>
+          <button id="largeNextRecordBtn" class="secondary" type="button">Siguiente</button>
+        </div>
+        <div class="large-preview-wrap">
+          <canvas id="largePreviewCanvas" width="1200" height="850" aria-label="Vista previa ampliada del certificado"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <template id="mappingTemplate">
+      <label>
+        <span></span>
+        <select></select>
+      </label>
+    </template>
+  </body>
+</html>
