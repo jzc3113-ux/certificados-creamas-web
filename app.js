@@ -143,6 +143,9 @@ function bindEvents() {
     closeDownloadModal();
     startNewBatch();
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.downloadModal?.hidden === false) closeDownloadModal();
+  });
   els.saveConfigBtn.addEventListener("click", saveConfigToBrowser);
   els.downloadConfigBtn.addEventListener("click", downloadConfigJson);
   els.generateBtn.addEventListener("click", generateCertificates);
@@ -584,12 +587,24 @@ function closeLargePreview() {
   if (els.downloadModal?.hidden !== false) document.body.classList.remove("modal-open");
 }
 
-function openDownloadModal() {
+function showDownloadModal() {
+  if (!els.downloadModal) {
+    setGenerationStatus("Descarga lista. ZIP generado correctamente gracias a la herramienta automatizada por Josué Cabrera.");
+    return;
+  }
   els.downloadModal.hidden = false;
   document.body.classList.add("modal-open");
+  const scheduleFrame = window.requestAnimationFrame || ((callback) => setTimeout(callback, 0));
+  scheduleFrame(() => {
+    els.downloadModal.classList.add("is-open");
+    const isVisible = (els.downloadModal.classList.contains?.("is-open") ?? true) && els.downloadModal.hidden === false;
+    if (!isVisible) setGenerationStatus("Descarga lista. ZIP generado correctamente gracias a la herramienta automatizada por Josué Cabrera.");
+  });
 }
 
 function closeDownloadModal() {
+  if (!els.downloadModal) return;
+  els.downloadModal.classList.remove("is-open");
   els.downloadModal.hidden = true;
   if (els.previewModal?.hidden !== false) document.body.classList.remove("modal-open");
 }
@@ -912,7 +927,8 @@ function downloadZip() {
   if (!state.zipBlob) return;
   if (state.zipStale) setGenerationStatus("Descargando el último ZIP generado. Hay cambios pendientes; genera nuevamente para actualizarlo.", true);
   saveAs(state.zipBlob, `certificados-creamas-${new Date().toISOString().slice(0, 10)}.zip`);
-  openDownloadModal();
+  setGenerationStatus("Descarga lista. ZIP generado correctamente gracias a la herramienta automatizada por Josué Cabrera.");
+  setTimeout(showDownloadModal, 0);
 }
 
 function saveConfigToBrowser() {

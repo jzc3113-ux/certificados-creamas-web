@@ -527,3 +527,41 @@ button.danger {
   gap: 0.8rem;
   justify-content: flex-end;
 }
+
+
+.download-modal[hidden] {
+  display: none !important;
+}
+
+.download-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(18, 27, 43, 0.76);
+}
+
+.download-modal.is-open {
+  display: flex;
+}
+
+.download-modal .download-modal-card {
+  position: relative;
+  max-height: min(90vh, 680px);
+  overflow: auto;
+  animation: modal-pop 0.18s ease-out;
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
