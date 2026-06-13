@@ -503,21 +503,21 @@ function updatePreviewButton() {
 }
 
 function drawPreview() {
-  drawCertificateToCanvas(els.previewCanvas, { showSelection: true });
+  renderCertificateToCanvas(getCurrentRecord(), els.previewCanvas, { showSelection: true });
   updateRecordIndicator();
 }
 
 function drawLargePreview() {
   if (!els.largePreviewCanvas || els.previewModal.hidden) return;
-  drawCertificateToCanvas(els.largePreviewCanvas, { showSelection: false });
+  renderCertificateToCanvas(getCurrentRecord(), els.largePreviewCanvas, { showSelection: false });
   updateRecordIndicator();
 }
 
-function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
+function renderCertificateToCanvas(record, canvas, { showSelection = false, resetWarnings = true } = {}) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
   ctx.clearRect(0, 0, width, height);
-  state.layoutWarnings = [];
+  if (resetWarnings) state.layoutWarnings = [];
 
   if (state.templateImage) {
     ctx.drawImage(state.templateImage, 0, 0, width, height);
@@ -525,7 +525,6 @@ function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
     drawPlaceholderTemplate(ctx, width, height);
   }
 
-  const record = getCurrentRecord();
   let yOffset = 0;
   CERTIFICATE_FIELDS.forEach((field) => {
     const originalY = state.config.fields[field.key].y;
@@ -537,6 +536,7 @@ function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
       yOffset = Math.max(yOffset, neededOffset);
     }
   });
+  return canvas;
 }
 
 
@@ -819,107 +819,14 @@ async function createPdfForRecord(record) {
   const { width, height } = state.templateSize;
   const orientation = width >= height ? "landscape" : "portrait";
   const pdf = new jsPDF({ orientation, unit: "px", format: [width, height], compress: true });
-  pdf.addImage(state.templateDataUrl, "PNG", 0, 0, width, height);
-  registerFontsInPdf(pdf);
-  let yOffset = 0;
-  CERTIFICATE_FIELDS.forEach((field) => {
-    const originalY = state.config.fields[field.key].y;
-    const yOverride = field.key === "nombre_completo" ? originalY : originalY + yOffset;
-    const result = addFieldToPdf(pdf, field.key, record, { yOverride });
-    if (field.key === "nombre_completo" && result?.bottom) {
-      const nextFieldY = state.config.fields.texto_certificado.y;
-      yOffset = Math.max(yOffset, result.bottom + 18 - nextFieldY, 0);
-    }
-  });
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  if (document.fonts?.ready) await document.fonts.ready;
+  renderCertificateToCanvas(record, canvas, { showSelection: false, resetWarnings: false });
+  const imageData = canvas.toDataURL("image/png");
+  pdf.addImage(imageData, "PNG", 0, 0, width, height);
   return pdf.output("blob");
-}
-
-function registerFontsInPdf(pdf) {
-  state.fonts.forEach((font) => {
-    if (!font.binary) return;
-    try {
-      const fileName = `${font.pdfName}.ttf`;
-      pdf.addFileToVFS(fileName, btoa(font.binary));
-      pdf.addFont(fileName, font.pdfName, "normal");
-      pdf.addFont(fileName, font.pdfName, "bold");
-    } catch (error) {
-      console.warn(`No se pudo registrar la fuente ${font.label} en el PDF`, error);
-      font.error = "No se pudo usar en PDF.";
-      addFontWarning(`La fuente “${font.label}” falló en PDF y se usó Helvetica.`);
-    }
-  });
-}
-
-function addFieldToPdf(pdf, key, record, { yOverride = null } = {}) {
-  const config = { ...state.config.fields[key] };
-  if (!config.visible) return null;
-  if (yOverride !== null) config.y = yOverride;
-  const rawText = getFieldText(key, record);
-  if (!rawText) return null;
-  const font = getFontById(config.fontId);
-  const layout = layoutPdfField(pdf, key, rawText, config, font);
-  const lineHeight = layout.size * 1.18;
-
-  layout.lines.forEach((line, lineIndex) => {
-    let currentX = alignedStartX(config.x, line.width, config.align);
-    const y = config.y + lineIndex * lineHeight;
-    line.segments.forEach((segment) => {
-      const bold = segment.bold || key === "nombre_completo";
-      setPdfFont(pdf, font, bold);
-      pdf.setFontSize(layout.size);
-      pdf.setTextColor(config.color);
-      pdf.text(segment.text, currentX, y, { baseline: "top" });
-      currentX += pdf.getTextWidth ? pdf.getTextWidth(segment.text) : segment.text.length * layout.size * 0.5;
-    });
-  });
-
-  if (layout.warning) addLayoutWarning(layout.warning);
-  return { bottom: config.y + layout.height, height: layout.height, lines: layout.lines, warning: layout.warning };
-}
-
-function layoutPdfField(pdf, key, rawText, config, font) {
-  const segments = parseRichText(rawText, config.uppercase);
-  const baseSize = Number(config.size || 16);
-  const minSize = Math.min(baseSize, Number(config.minSize || baseSize));
-  const maxLines = Math.max(1, Number(config.maxLines || 99));
-  const mode = config.overflowMode || (config.autoFit ? "shrink-wrap" : "wrap");
-  const measure = (text, bold, size) => {
-    setPdfFont(pdf, font, bold || key === "nombre_completo");
-    pdf.setFontSize(size);
-    return pdf.getTextWidth ? pdf.getTextWidth(text) : text.length * size * 0.5;
-  };
-
-  if (config.autoFit && mode.includes("shrink")) {
-    for (let size = baseSize; size >= minSize; size -= 1) {
-      const oneLine = buildRichLines(segments, (text, bold) => measure(text, bold, size), config.maxWidth, 1);
-      if (!oneLine.truncated && oneLine.lines.length <= 1) return pdfLayoutResult(oneLine.lines, size);
-    }
-  }
-
-  const wrapSize = config.autoFit && mode === "shrink-wrap" ? minSize : baseSize;
-  const wrapped = buildRichLines(segments, (text, bold) => measure(text, bold, wrapSize), config.maxWidth, mode === "shrink" ? 1 : maxLines);
-  const result = pdfLayoutResult(wrapped.lines, wrapSize);
-  if (wrapped.truncated && key === "nombre_completo") {
-    result.warning = "El nombre es demasiado largo para el espacio disponible. Reduce tamaño o aumenta ancho máximo.";
-  }
-  return result;
-}
-
-function pdfLayoutResult(lines, size) {
-  const lineHeight = size * 1.18;
-  return { lines, size, height: Math.max(lineHeight, lines.length * lineHeight), warning: "" };
-}
-
-function setPdfFont(pdf, font, bold = false) {
-  const fontName = getPdfFontName(font);
-  const style = bold ? "bold" : "normal";
-  try {
-    pdf.setFont(fontName, style);
-  } catch (error) {
-    console.warn(`No se pudo aplicar la fuente ${font.label}; se usará Helvetica`, error);
-    addFontWarning(`La fuente “${font.label}” no se pudo aplicar y se usó Helvetica.`);
-    pdf.setFont("helvetica", style);
-  }
 }
 
 function getPdfFontName(font) {

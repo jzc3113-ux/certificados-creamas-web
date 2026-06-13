@@ -83,6 +83,7 @@ Si una fuente falla al previsualizarse o al generarse en PDF, la app muestra un 
 
 - **Ver vista previa en grande** abre un modal con fondo oscuro, el certificado centrado, navegación entre registros y scroll cuando el diseño no entra completo en pantalla.
 - **Generar vista previa** actualiza la vista pequeña y la vista grande si está abierta.
+- El PDF se genera desde el mismo canvas renderizado que usa la vista previa, insertando la imagen completa del certificado en jsPDF. Por eso posiciones, tamaños, saltos de línea, fuentes y negritas coinciden con lo que ves antes de descargar.
 - Después de generar un ZIP, puedes seguir moviendo campos o cambiando estilos. Si haces cambios, el ZIP queda marcado como desactualizado y debes generar certificados otra vez para obtener un ZIP actualizado.
 - **Nuevo lote** limpia certificados generados, ZIP anterior, mensajes e índice de vista previa, pero conserva plantilla PNG, fuentes y configuración de campos para cargar otro Excel similar.
 - **Reiniciar todo** limpia Excel, PNG, fuentes, JSON, configuración, vista previa y ZIP después de confirmar la acción.
