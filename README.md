@@ -52,7 +52,7 @@ Si el Excel tiene una sola hoja, la app la usa automáticamente. Si tiene varias
 6. Revisa o cambia el mapeo de columnas. Cualquier campo opcional puede quedar como “No usar”.
 7. Revisa la vista previa pequeña para ajustar posiciones.
 8. Usa **Ver vista previa en grande** para revisar el certificado completo antes de generar todos los PDFs.
-9. Arrastra los campos en el canvas o ajusta manualmente X, Y, tamaño, color, ancho máximo, visibilidad, mayúsculas, alineación y fuente por campo.
+9. Arrastra los campos en el canvas o ajusta manualmente X, Y, tamaño, color, ancho máximo, interletrado, espacio inferior, visibilidad, mayúsculas, alineación y fuente por campo.
 10. Opcionalmente, guarda la configuración en el navegador o descárgala como JSON para reutilizarla.
 11. Genera los certificados.
 12. Descarga el ZIP con todos los PDFs.
@@ -83,7 +83,7 @@ Si una fuente falla al previsualizarse o al generarse en PDF, la app muestra un 
 
 - **Ver vista previa en grande** abre un modal con fondo oscuro, el certificado centrado, navegación entre registros y scroll cuando el diseño no entra completo en pantalla.
 - **Generar vista previa** actualiza la vista pequeña y la vista grande si está abierta.
-- El PDF se genera desde el mismo canvas renderizado que usa la vista previa, insertando la imagen completa del certificado en jsPDF. Por eso posiciones, tamaños, saltos de línea, fuentes y negritas coinciden con lo que ves antes de descargar.
+- El PDF se genera desde el mismo canvas renderizado que usa la vista previa, insertando la imagen completa del certificado en jsPDF. Por eso posiciones, tamaños, saltos de línea, interletrado, espacios inferiores, fuentes y negritas coinciden con lo que ves antes de descargar.
 - Después de generar un ZIP, puedes seguir moviendo campos o cambiando estilos. Si haces cambios, el ZIP queda marcado como desactualizado y debes generar certificados otra vez para obtener un ZIP actualizado.
 - **Nuevo lote** limpia certificados generados, ZIP anterior, mensajes e índice de vista previa, pero conserva plantilla PNG, fuentes y configuración de campos para cargar otro Excel similar.
 - **Reiniciar todo** limpia Excel, PNG, fuentes, JSON, configuración, vista previa y ZIP después de confirmar la acción.
@@ -94,9 +94,11 @@ El campo `nombre_completo` tiene autoajuste por defecto: reduce el tamaño hasta
 
 Para poner una parte del texto en negrita, escribe el texto entre doble asterisco en el Excel. Ejemplo: `Por su participación en **Potencia tu perfil profesional**`. Esto funciona en textos largos como `texto_certificado` y `texto_gracias`, respeta saltos de línea reales y también secuencias `\n` escritas dentro de la celda.
 
+Cada campo incluye controles finos de acabado tipográfico: `letterSpacing` para interletrado y `marginBottom` para empujar el siguiente bloque visual hacia abajo sin mover manualmente todos los campos. Por defecto, `nombre_completo` incluye un pequeño espacio inferior para separar mejor el nombre del contenido siguiente.
+
 ## Configuración JSON
 
-El JSON es una opción avanzada. La configuración exportada solo contiene posiciones, estilos, fuente asignada por campo y mapeo de columnas. No incluye Excel, PNG, archivos de fuente ni PDFs generados.
+El JSON es una opción avanzada. La configuración exportada solo contiene posiciones, estilos, interletrado, espacio inferior, fuente asignada por campo y mapeo de columnas. No incluye Excel, PNG, archivos de fuente ni PDFs generados.
 
 La exportación incluye la fuente por campo en `fields` y también en `campos`, por ejemplo:
 

@@ -31,11 +31,11 @@ const DEFAULT_CONFIG = {
     correo: "",
   },
   fields: {
-    nombre_completo: { x: 600, y: 300, size: 86, color: "#243047", maxWidth: 900, visible: true, uppercase: true, align: "center", fontId: DEFAULT_FONT_ID, autoFit: true, minSize: 70, maxLines: 2, overflowMode: "shrink-wrap" },
-    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 18, maxLines: 6, overflowMode: "wrap" },
-    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 4, overflowMode: "wrap" },
-    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 2, overflowMode: "wrap" },
-    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 12, maxLines: 2, overflowMode: "wrap" },
+    nombre_completo: { x: 600, y: 300, size: 86, color: "#243047", maxWidth: 900, visible: true, uppercase: true, align: "center", fontId: DEFAULT_FONT_ID, autoFit: true, minSize: 70, maxLines: 2, overflowMode: "shrink-wrap", letterSpacing: 0, marginBottom: 14 },
+    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 18, maxLines: 6, overflowMode: "wrap", letterSpacing: 0, marginBottom: 0 },
+    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 4, overflowMode: "wrap", letterSpacing: 0, marginBottom: 0 },
+    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 2, overflowMode: "wrap", letterSpacing: 0, marginBottom: 0 },
+    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 12, maxLines: 2, overflowMode: "wrap", letterSpacing: 0, marginBottom: 0 },
   },
 };
 
@@ -446,6 +446,10 @@ function renderFieldEditor() {
       ${numberInput("Tamaño mínimo", "minSize", config.minSize ?? Math.max(8, config.size - 8))}
       ${numberInput("Máx. líneas", "maxLines", config.maxLines ?? 4)}
     </div>
+    <div class="inline">
+      ${numberInput("Interletrado", "letterSpacing", config.letterSpacing ?? 0, "0.1")}
+      ${numberInput("Espacio inferior", "marginBottom", config.marginBottom ?? 0)}
+    </div>
     <label><span>Modo overflow</span><select data-prop="overflowMode">
       <option value="shrink-wrap">Reducir y partir</option>
       <option value="shrink">Reducir</option>
@@ -474,8 +478,10 @@ function fontOptionsHtml() {
   return state.fonts.map((font) => `<option value="${escapeHtml(font.id)}">${escapeHtml(font.label)}${font.error ? " (respaldo si falla)" : ""}</option>`).join("");
 }
 
-function numberInput(label, prop, value) {
-  return `<label><span>${label}</span><input data-prop="${prop}" type="number" step="1" value="${Number(value).toFixed(0)}"></label>`;
+function numberInput(label, prop, value, step = "1") {
+  const numericValue = Number(value || 0);
+  const formattedValue = step === "1" ? numericValue.toFixed(0) : String(numericValue);
+  return `<label><span>${label}</span><input data-prop="${prop}" type="number" step="${step}" value="${formattedValue}"></label>`;
 }
 
 function updateSelectedFieldFromInput(event) {
@@ -526,15 +532,18 @@ function renderCertificateToCanvas(record, canvas, { showSelection = false, rese
   }
 
   let yOffset = 0;
-  CERTIFICATE_FIELDS.forEach((field) => {
+  CERTIFICATE_FIELDS.forEach((field, index) => {
     const originalY = state.config.fields[field.key].y;
-    const yOverride = field.key === "nombre_completo" ? originalY : originalY + yOffset;
+    const yOverride = index === 0 ? originalY : originalY + yOffset;
     const result = drawFieldOnCanvas(ctx, field.key, record, { showSelection, yOverride });
-    if (field.key === "nombre_completo" && result?.bottom) {
-      const nextFieldY = state.config.fields.texto_certificado.y;
-      const neededOffset = Math.max(0, result.bottom + 18 - nextFieldY);
-      yOffset = Math.max(yOffset, neededOffset);
-    }
+    if (!result) return;
+    const nextField = CERTIFICATE_FIELDS[index + 1];
+    if (!nextField) return;
+    const desiredGap = Number(state.config.fields[field.key].marginBottom || 0);
+    yOffset += desiredGap;
+    const nextFieldY = state.config.fields[nextField.key].y;
+    const neededOffset = Math.max(0, result.bottom - (nextFieldY + yOffset));
+    yOffset += neededOffset;
   });
   return canvas;
 }
@@ -604,9 +613,10 @@ function layoutCanvasField(ctx, key, rawText, config, font) {
   const minSize = Math.min(baseSize, Number(config.minSize || baseSize));
   const maxLines = Math.max(1, Number(config.maxLines || 99));
   const mode = config.overflowMode || (config.autoFit ? "shrink-wrap" : "wrap");
+  const letterSpacing = Number(config.letterSpacing || 0);
   const measure = (text, bold, size) => {
     setCanvasFont(ctx, font, size, bold || key === "nombre_completo");
-    return ctx.measureText(text).width;
+    return measureTextWithLetterSpacing(ctx, text, letterSpacing);
   };
 
   if (config.autoFit && mode.includes("shrink")) {
@@ -638,14 +648,33 @@ function renderRichCanvasLines(ctx, lines, config, font, size, key) {
     line.segments.forEach((segment) => {
       const bold = segment.bold || key === "nombre_completo";
       setCanvasFont(ctx, font, size, bold);
-      ctx.fillText(segment.text, currentX, y);
-      currentX += ctx.measureText(segment.text).width;
+      drawTextWithLetterSpacing(ctx, segment.text, currentX, y, Number(config.letterSpacing || 0));
+      currentX += measureTextWithLetterSpacing(ctx, segment.text, Number(config.letterSpacing || 0));
     });
   });
 }
 
 function setCanvasFont(ctx, font, size, bold = false) {
   ctx.font = `${bold ? "700" : "400"} ${size}px "${font.family}", Arial, Helvetica, sans-serif`;
+}
+
+function measureTextWithLetterSpacing(ctx, text, letterSpacing = 0) {
+  const characters = Array.from(String(text));
+  if (!characters.length) return 0;
+  const textWidth = characters.reduce((total, character) => total + ctx.measureText(character).width, 0);
+  return textWidth + Math.max(0, characters.length - 1) * letterSpacing;
+}
+
+function drawTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
+  if (!letterSpacing) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  let currentX = x;
+  Array.from(String(text)).forEach((character) => {
+    ctx.fillText(character, currentX, y);
+    currentX += ctx.measureText(character).width + letterSpacing;
+  });
 }
 
 function alignedStartX(anchorX, width, align = "left") {
