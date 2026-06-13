@@ -457,3 +457,30 @@ body.modal-open {
   background: #fff;
   box-shadow: 0 14px 30px rgba(36, 48, 71, 0.18);
 }
+
+button.danger {
+  background: #ffe8e5;
+  box-shadow: 0 8px 0 #f5b5ad;
+  color: #9f1d14;
+}
+
+.modal-close {
+  width: 3rem;
+  min-height: 3rem;
+  padding: 0;
+  border-radius: 999px;
+  background: #243047;
+  color: #fff;
+  box-shadow: none;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.preview-modal-card {
+  width: min(98vw, 1500px);
+  max-height: 96vh;
+}
+
+.large-preview-wrap {
+  max-height: 78vh;
+}

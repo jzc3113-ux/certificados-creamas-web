@@ -110,9 +110,12 @@
           <button id="downloadConfigBtn" class="secondary" type="button">Descargar JSON opcional</button>
           <button id="generateBtn" class="primary" type="button">Generar certificados</button>
           <button id="downloadZipBtn" class="success" type="button" disabled>Descargar ZIP</button>
+          <button id="newBatchBtn" class="secondary" type="button">Nuevo lote</button>
+          <button id="resetAllBtn" class="secondary danger" type="button">Reiniciar todo</button>
         </div>
         <progress id="progressBar" max="100" value="0"></progress>
         <p class="hint">Usa JSON solo si quieres recuperar una configuración anterior de posiciones y estilos. Puedes generar certificados sin cargar JSON.</p>
+        <p class="hint">Para poner una parte del texto en negrita, escribe el texto entre doble asterisco en el Excel. Ejemplo: <strong>**texto importante**</strong>.</p>
         <p id="generationStatus" class="generation-status" aria-live="polite">Listo para empezar sin JSON.</p>
       </section>
     </main>
@@ -125,7 +128,7 @@
             <h2 id="largePreviewTitle">Certificado completo</h2>
             <p class="hint">Esta vista se genera en tu navegador y usa la misma plantilla, campos, estilos y fuentes que el PDF.</p>
           </div>
-          <button id="closePreviewBtn" class="secondary" type="button">Cerrar</button>
+          <button id="closePreviewBtn" class="modal-close" type="button" aria-label="Cerrar vista previa">×</button>
         </div>
         <div class="preview-modal-toolbar">
           <button id="largePrevRecordBtn" class="secondary" type="button">Anterior</button>

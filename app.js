@@ -31,15 +31,15 @@ const DEFAULT_CONFIG = {
     correo: "",
   },
   fields: {
-    nombre_completo: { x: 600, y: 330, size: 46, color: "#243047", maxWidth: 840, visible: true, uppercase: true, align: "center", fontId: DEFAULT_FONT_ID },
-    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
-    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
-    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID },
-    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right", fontId: DEFAULT_FONT_ID },
+    nombre_completo: { x: 600, y: 300, size: 86, color: "#243047", maxWidth: 900, visible: true, uppercase: true, align: "center", fontId: DEFAULT_FONT_ID, autoFit: true, minSize: 70, maxLines: 2, overflowMode: "shrink-wrap" },
+    texto_certificado: { x: 600, y: 430, size: 25, color: "#243047", maxWidth: 860, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 18, maxLines: 6, overflowMode: "wrap" },
+    texto_gracias: { x: 600, y: 520, size: 21, color: "#697386", maxWidth: 760, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 4, overflowMode: "wrap" },
+    fecha: { x: 600, y: 635, size: 24, color: "#243047", maxWidth: 600, visible: true, uppercase: false, align: "center", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 16, maxLines: 2, overflowMode: "wrap" },
+    codigo_certificado: { x: 1010, y: 780, size: 16, color: "#243047", maxWidth: 280, visible: true, uppercase: false, align: "right", fontId: DEFAULT_FONT_ID, autoFit: false, minSize: 12, maxLines: 2, overflowMode: "wrap" },
   },
 };
 
-const STORAGE_KEY = "creamas-certificados-config-v2";
+const STORAGE_KEY = "creamas-certificados-config-v3";
 const state = {
   workbook: null,
   sheetNames: [],
@@ -57,6 +57,8 @@ const state = {
   selectedRowIndex: 0,
   drag: null,
   zipBlob: null,
+  zipStale: false,
+  layoutWarnings: [],
 };
 
 const els = {};
@@ -100,6 +102,8 @@ function cacheElements() {
     downloadConfigBtn: document.getElementById("downloadConfigBtn"),
     generateBtn: document.getElementById("generateBtn"),
     downloadZipBtn: document.getElementById("downloadZipBtn"),
+    newBatchBtn: document.getElementById("newBatchBtn"),
+    resetAllBtn: document.getElementById("resetAllBtn"),
     progressBar: document.getElementById("progressBar"),
     generationStatus: document.getElementById("generationStatus"),
     prevRecordBtn: document.getElementById("prevRecordBtn"),
@@ -113,7 +117,10 @@ function bindEvents() {
   els.templateInput.addEventListener("change", handleTemplateUpload);
   els.fontInput.addEventListener("change", handleFontUpload);
   els.configInput.addEventListener("change", handleConfigUpload);
-  els.sheetSelect.addEventListener("change", () => applyWorkbookSheet(els.sheetSelect.value));
+  els.sheetSelect.addEventListener("change", () => {
+    markZipOutdated();
+    applyWorkbookSheet(els.sheetSelect.value);
+  });
   els.previewBtn.addEventListener("click", updatePreviewButton);
   els.largePreviewBtn.addEventListener("click", openLargePreview);
   els.largePreviewBtnActions.addEventListener("click", openLargePreview);
@@ -127,6 +134,8 @@ function bindEvents() {
   els.downloadConfigBtn.addEventListener("click", downloadConfigJson);
   els.generateBtn.addEventListener("click", generateCertificates);
   els.downloadZipBtn.addEventListener("click", downloadZip);
+  els.newBatchBtn.addEventListener("click", startNewBatch);
+  els.resetAllBtn.addEventListener("click", resetAll);
   els.prevRecordBtn.addEventListener("click", () => moveRecord(-1));
   els.nextRecordBtn.addEventListener("click", () => moveRecord(1));
 
@@ -136,9 +145,88 @@ function bindEvents() {
   els.previewCanvas.addEventListener("pointerleave", endDrag);
 }
 
+function markZipOutdated() {
+  if (!state.zipBlob) return;
+  state.zipStale = true;
+  setGenerationStatus("Hay cambios pendientes. Genera nuevamente los certificados para actualizar el ZIP.", true);
+}
+
+function clearGeneratedArtifacts({ keepMessage = false } = {}) {
+  state.zipBlob = null;
+  state.zipStale = false;
+  els.downloadZipBtn.disabled = true;
+  els.progressBar.value = 0;
+  if (!keepMessage) setGenerationStatus("Listo para generar certificados.");
+}
+
+function clearExcelData() {
+  state.workbook = null;
+  state.sheetNames = [];
+  state.selectedSheetName = "";
+  state.rows = [];
+  state.headers = [];
+  state.selectedRowIndex = 0;
+}
+
+function startNewBatch() {
+  clearExcelData();
+  clearGeneratedArtifacts({ keepMessage: true });
+  if (els.excelInput) els.excelInput.value = "";
+  renderSheetSelector();
+  renderMappingControls();
+  drawPreview();
+  closeLargePreview();
+  updateStatus();
+  setGenerationStatus("Nuevo lote listo. Se conservaron plantilla, fuentes, posiciones y estilos; sube otro Excel para generar un nuevo ZIP.");
+}
+
+function resetAll() {
+  const confirmed = window.confirm("¿Seguro que deseas reiniciar todo? Se limpiarán los archivos cargados y la configuración actual.");
+  if (!confirmed) return;
+  state.fonts.filter((font) => font.objectUrl).forEach((font) => URL.revokeObjectURL(font.objectUrl));
+  Object.assign(state, {
+    workbook: null,
+    sheetNames: [],
+    selectedSheetName: "",
+    rows: [],
+    headers: [],
+    templateImage: null,
+    templateDataUrl: "",
+    templateSize: { width: 1200, height: 850 },
+    fonts: structuredClone(FALLBACK_FONTS),
+    unavailableFonts: [],
+    fontWarnings: [],
+    config: structuredClone(DEFAULT_CONFIG),
+    selectedField: "nombre_completo",
+    selectedRowIndex: 0,
+    drag: null,
+    zipBlob: null,
+    zipStale: false,
+    layoutWarnings: [],
+  });
+  [els.excelInput, els.templateInput, els.fontInput, els.configInput].forEach((input) => {
+    if (input) input.value = "";
+  });
+  localStorage.removeItem(STORAGE_KEY);
+  els.previewCanvas.width = state.templateSize.width;
+  els.previewCanvas.height = state.templateSize.height;
+  els.largePreviewCanvas.width = state.templateSize.width;
+  els.largePreviewCanvas.height = state.templateSize.height;
+  renderSheetSelector();
+  renderMappingControls();
+  renderFieldTabs();
+  renderFieldEditor();
+  closeLargePreview();
+  clearGeneratedArtifacts({ keepMessage: true });
+  drawPreview();
+  updateStatus();
+  setGenerationStatus("Todo se reinició. Los archivos y la configuración actual se limpiaron del navegador.");
+}
+
 async function handleExcelUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
+  markZipOutdated();
   setGenerationStatus("Leyendo Excel simple...");
   const buffer = await file.arrayBuffer();
   state.workbook = XLSX.read(buffer, { type: "array", cellDates: true });
@@ -178,6 +266,7 @@ function renderSheetSelector() {
 async function handleTemplateUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
+  markZipOutdated();
   if (file.type && file.type !== "image/png") {
     setGenerationStatus("La plantilla debe ser PNG.", true);
     return;
@@ -197,6 +286,7 @@ async function handleTemplateUpload(event) {
 async function handleFontUpload(event) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
+  markZipOutdated();
 
   const uploadedFonts = [];
   for (const file of files) {
@@ -277,6 +367,7 @@ async function handleConfigUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
   try {
+    markZipOutdated();
     const imported = JSON.parse(await file.text());
     applyConfig(imported);
     renderMappingControls();
@@ -312,6 +403,7 @@ function renderMappingControls() {
     select.value = state.config.columnMap[field.key] || "";
     select.addEventListener("change", () => {
       state.config.columnMap[field.key] = select.value;
+      markZipOutdated();
       drawPreview();
       drawLargePreview();
     });
@@ -350,6 +442,15 @@ function renderFieldEditor() {
       ${numberInput("Tamaño", "size", config.size)}
       ${numberInput("Ancho máximo", "maxWidth", config.maxWidth)}
     </div>
+    <div class="inline">
+      ${numberInput("Tamaño mínimo", "minSize", config.minSize ?? Math.max(8, config.size - 8))}
+      ${numberInput("Máx. líneas", "maxLines", config.maxLines ?? 4)}
+    </div>
+    <label><span>Modo overflow</span><select data-prop="overflowMode">
+      <option value="shrink-wrap">Reducir y partir</option>
+      <option value="shrink">Reducir</option>
+      <option value="wrap">Partir líneas</option>
+    </select></label>
     <label><span>Color</span><input data-prop="color" type="color" value="${config.color}"></label>
     <label><span>Alineación</span><select data-prop="align">
       <option value="left">Izquierda</option>
@@ -358,9 +459,11 @@ function renderFieldEditor() {
     </select></label>
     <label class="checkbox-row"><input data-prop="visible" type="checkbox" ${config.visible ? "checked" : ""}> Visible</label>
     <label class="checkbox-row"><input data-prop="uppercase" type="checkbox" ${config.uppercase ? "checked" : ""}> Mayúsculas</label>
+    <label class="checkbox-row"><input data-prop="autoFit" type="checkbox" ${config.autoFit ? "checked" : ""}> Autoajuste</label>
   `;
   els.fieldEditor.querySelector('[data-prop="fontId"]').value = fontExists(config.fontId) ? config.fontId : DEFAULT_FONT_ID;
   els.fieldEditor.querySelector('[data-prop="align"]').value = config.align;
+  els.fieldEditor.querySelector('[data-prop="overflowMode"]').value = config.overflowMode || "wrap";
   els.fieldEditor.querySelectorAll("[data-prop]").forEach((input) => {
     input.addEventListener("input", updateSelectedFieldFromInput);
     input.addEventListener("change", updateSelectedFieldFromInput);
@@ -383,6 +486,7 @@ function updateSelectedFieldFromInput(event) {
   else if (input.type === "number") config[prop] = Number(input.value || 0);
   else config[prop] = input.value;
   if (prop === "fontId") config.font = getFontById(config.fontId).label;
+  markZipOutdated();
   drawPreview();
   drawLargePreview();
 }
@@ -394,7 +498,8 @@ function updatePreviewButton() {
     setGenerationStatus("Sube primero un Excel y una plantilla PNG para generar la vista previa.", true);
     return;
   }
-  setGenerationStatus("Vista previa actualizada.");
+  const warning = state.layoutWarnings.length ? ` ${state.layoutWarnings.join(" ")}` : "";
+  setGenerationStatus(`Vista previa actualizada.${warning}`, Boolean(state.layoutWarnings.length));
 }
 
 function drawPreview() {
@@ -412,6 +517,7 @@ function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
   ctx.clearRect(0, 0, width, height);
+  state.layoutWarnings = [];
 
   if (state.templateImage) {
     ctx.drawImage(state.templateImage, 0, 0, width, height);
@@ -420,7 +526,17 @@ function drawCertificateToCanvas(canvas, { showSelection = false } = {}) {
   }
 
   const record = getCurrentRecord();
-  CERTIFICATE_FIELDS.forEach((field) => drawFieldOnCanvas(ctx, field.key, record, { showSelection }));
+  let yOffset = 0;
+  CERTIFICATE_FIELDS.forEach((field) => {
+    const originalY = state.config.fields[field.key].y;
+    const yOverride = field.key === "nombre_completo" ? originalY : originalY + yOffset;
+    const result = drawFieldOnCanvas(ctx, field.key, record, { showSelection, yOverride });
+    if (field.key === "nombre_completo" && result?.bottom) {
+      const nextFieldY = state.config.fields.texto_certificado.y;
+      const neededOffset = Math.max(0, result.bottom + 18 - nextFieldY);
+      yOffset = Math.max(yOffset, neededOffset);
+    }
+  });
 }
 
 
@@ -435,7 +551,8 @@ function openLargePreview() {
   els.previewModal.hidden = false;
   document.body.classList.add("modal-open");
   drawLargePreview();
-  setGenerationStatus("Vista previa grande actualizada.");
+  const warning = state.layoutWarnings.length ? ` ${state.layoutWarnings.join(" ")}` : "";
+  setGenerationStatus(`Vista previa grande actualizada.${warning}`, Boolean(state.layoutWarnings.length));
 }
 
 function closeLargePreview() {
@@ -455,48 +572,154 @@ function drawPlaceholderTemplate(ctx, width, height) {
   ctx.fillText("Sube una plantilla PNG", width / 2, 120);
 }
 
-function drawFieldOnCanvas(ctx, key, record, { showSelection = true } = {}) {
-  const fieldConfig = state.config.fields[key];
-  if (!fieldConfig.visible) return;
-  const text = getFieldText(key, record) || (state.rows.length ? "" : sampleText(key));
-  if (!text) return;
-  const displayText = fieldConfig.uppercase ? text.toUpperCase() : text;
+function drawFieldOnCanvas(ctx, key, record, { showSelection = true, yOverride = null } = {}) {
+  const fieldConfig = { ...state.config.fields[key] };
+  if (!fieldConfig.visible) return null;
+  if (yOverride !== null) fieldConfig.y = yOverride;
+  const rawText = getFieldText(key, record) || (state.rows.length ? "" : sampleText(key));
+  if (!rawText) return null;
   const font = getFontById(fieldConfig.fontId);
+  const layout = layoutCanvasField(ctx, key, rawText, fieldConfig, font);
   ctx.save();
   ctx.fillStyle = fieldConfig.color;
-  ctx.font = `${key === "nombre_completo" ? "700" : "400"} ${fieldConfig.size}px "${font.family}", Arial, Helvetica, sans-serif`;
-  ctx.textAlign = fieldConfig.align;
+  ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  wrapCanvasText(ctx, displayText, fieldConfig.x, fieldConfig.y, fieldConfig.maxWidth, fieldConfig.size * 1.22);
+  renderRichCanvasLines(ctx, layout.lines, fieldConfig, font, layout.size, key);
 
   if (showSelection && key === state.selectedField) {
     ctx.strokeStyle = "rgba(46, 184, 114, 0.85)";
     ctx.lineWidth = 2;
-    const startX = fieldConfig.align === "center" ? fieldConfig.x - fieldConfig.maxWidth / 2 : fieldConfig.align === "right" ? fieldConfig.x - fieldConfig.maxWidth : fieldConfig.x;
-    ctx.strokeRect(startX - 8, fieldConfig.y - 8, fieldConfig.maxWidth + 16, fieldConfig.size * 1.5 + 16);
+    const startX = alignedStartX(fieldConfig.x, fieldConfig.maxWidth, fieldConfig.align);
+    ctx.strokeRect(startX - 8, fieldConfig.y - 8, fieldConfig.maxWidth + 16, layout.height + 16);
   }
   ctx.restore();
+
+  if (layout.warning) addLayoutWarning(layout.warning);
+  return { bottom: fieldConfig.y + layout.height, height: layout.height, lines: layout.lines, warning: layout.warning };
+}
+
+function layoutCanvasField(ctx, key, rawText, config, font) {
+  const segments = parseRichText(rawText, config.uppercase);
+  const baseSize = Number(config.size || 16);
+  const minSize = Math.min(baseSize, Number(config.minSize || baseSize));
+  const maxLines = Math.max(1, Number(config.maxLines || 99));
+  const mode = config.overflowMode || (config.autoFit ? "shrink-wrap" : "wrap");
+  const measure = (text, bold, size) => {
+    setCanvasFont(ctx, font, size, bold || key === "nombre_completo");
+    return ctx.measureText(text).width;
+  };
+
+  if (config.autoFit && mode.includes("shrink")) {
+    for (let size = baseSize; size >= minSize; size -= 1) {
+      const oneLine = buildRichLines(segments, (text, bold) => measure(text, bold, size), config.maxWidth, 1);
+      if (!oneLine.truncated && oneLine.lines.length <= 1) return canvasLayoutResult(oneLine.lines, size, config);
+    }
+  }
+
+  const wrapSize = config.autoFit && mode === "shrink-wrap" ? minSize : baseSize;
+  const wrapped = buildRichLines(segments, (text, bold) => measure(text, bold, wrapSize), config.maxWidth, mode === "shrink" ? 1 : maxLines);
+  const result = canvasLayoutResult(wrapped.lines, wrapSize, config);
+  if (wrapped.truncated && key === "nombre_completo") {
+    result.warning = "El nombre es demasiado largo para el espacio disponible. Reduce tamaño o aumenta ancho máximo.";
+  }
+  return result;
+}
+
+function canvasLayoutResult(lines, size, config) {
+  const lineHeight = size * 1.18;
+  return { lines, size, lineHeight, height: Math.max(lineHeight, lines.length * lineHeight), warning: "" };
+}
+
+function renderRichCanvasLines(ctx, lines, config, font, size, key) {
+  const lineHeight = size * 1.18;
+  lines.forEach((line, lineIndex) => {
+    let currentX = alignedStartX(config.x, line.width, config.align);
+    const y = config.y + lineIndex * lineHeight;
+    line.segments.forEach((segment) => {
+      const bold = segment.bold || key === "nombre_completo";
+      setCanvasFont(ctx, font, size, bold);
+      ctx.fillText(segment.text, currentX, y);
+      currentX += ctx.measureText(segment.text).width;
+    });
+  });
+}
+
+function setCanvasFont(ctx, font, size, bold = false) {
+  ctx.font = `${bold ? "700" : "400"} ${size}px "${font.family}", Arial, Helvetica, sans-serif`;
+}
+
+function alignedStartX(anchorX, width, align = "left") {
+  if (align === "center") return anchorX - width / 2;
+  if (align === "right") return anchorX - width;
+  return anchorX;
+}
+
+function parseRichText(text, uppercase = false) {
+  const normalized = String(text).replace(/\\n/g, "\n");
+  return normalized.split("**").map((part, index) => ({
+    text: uppercase ? part.toUpperCase() : part,
+    bold: index % 2 === 1,
+  })).filter((segment) => segment.text.length);
+}
+
+function buildRichLines(segments, measure, maxWidth, maxLines = Infinity) {
+  const lines = [];
+  let current = emptyRichLine();
+  let truncated = false;
+
+  const pushLine = () => {
+    trimRichLine(current);
+    if (current.segments.length || !lines.length) lines.push(current);
+    current = emptyRichLine();
+    if (lines.length >= maxLines) truncated = true;
+  };
+
+  outer: for (const segment of segments) {
+    const tokens = segment.text.split(/(\n|\s+)/).filter((token) => token.length);
+    for (const token of tokens) {
+      if (truncated) break outer;
+      if (token === "\n") {
+        pushLine();
+        continue;
+      }
+      const isSpace = /^\s+$/.test(token);
+      const text = isSpace ? " " : token;
+      if (isSpace && !current.segments.length) continue;
+      const width = measure(text, segment.bold);
+      if (!isSpace && current.segments.length && current.width + width > maxWidth) {
+        pushLine();
+        if (truncated) break outer;
+      }
+      current.segments.push({ text, bold: segment.bold, width });
+      current.width += width;
+    }
+  }
+  if (!truncated && current.segments.length) pushLine();
+  return { lines: lines.slice(0, maxLines), truncated };
+}
+
+function emptyRichLine() {
+  return { segments: [], width: 0 };
+}
+
+function trimRichLine(line) {
+  while (line.segments.length && /^\s+$/.test(line.segments[line.segments.length - 1].text)) {
+    const removed = line.segments.pop();
+    line.width = Math.max(0, line.width - (removed.width || 0));
+  }
+  while (line.segments.length && /^\s+$/.test(line.segments[0].text)) {
+    const removed = line.segments.shift();
+    line.width = Math.max(0, line.width - (removed.width || 0));
+  }
+}
+
+function addLayoutWarning(message) {
+  if (!state.layoutWarnings.includes(message)) state.layoutWarnings.push(message);
 }
 
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
-  const paragraphs = String(text).split(/\n+/);
-  let currentY = y;
-  paragraphs.forEach((paragraph) => {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    let line = "";
-    words.forEach((word) => {
-      const testLine = line ? `${line} ${word}` : word;
-      if (ctx.measureText(testLine).width > maxWidth && line) {
-        ctx.fillText(line, x, currentY);
-        line = word;
-        currentY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    });
-    ctx.fillText(line, x, currentY);
-    currentY += lineHeight;
-  });
+  const layout = buildRichLines(parseRichText(text), (token) => ctx.measureText(token).width, maxWidth, Infinity);
+  layout.lines.forEach((line, index) => ctx.fillText(line.segments.map((segment) => segment.text).join(""), x, y + index * lineHeight));
 }
 
 function getCanvasPoint(event) {
@@ -534,6 +757,7 @@ function dragField(event) {
 }
 
 function endDrag() {
+  if (state.drag) markZipOutdated();
   state.drag = null;
   els.previewCanvas.classList.remove("dragging");
 }
@@ -544,7 +768,8 @@ function hitTestField(point) {
     if (!config.visible) return false;
     const x = config.align === "center" ? config.x - config.maxWidth / 2 : config.align === "right" ? config.x - config.maxWidth : config.x;
     const y = config.y;
-    return point.x >= x - 12 && point.x <= x + config.maxWidth + 12 && point.y >= y - 12 && point.y <= y + Math.max(config.size * 2, 48);
+    const estimatedHeight = Math.max(config.size * (config.maxLines || 2) * 1.2, 48);
+    return point.x >= x - 12 && point.x <= x + config.maxWidth + 12 && point.y >= y - 12 && point.y <= y + estimatedHeight;
   })?.key;
 }
 
@@ -554,9 +779,11 @@ async function generateCertificates() {
   els.generateBtn.disabled = true;
   els.downloadZipBtn.disabled = true;
   state.zipBlob = null;
+  state.zipStale = false;
   els.progressBar.value = 0;
   const zip = new JSZip();
   state.fontWarnings = [];
+  state.layoutWarnings = [];
 
   try {
     for (let index = 0; index < state.rows.length; index += 1) {
@@ -574,9 +801,11 @@ async function generateCertificates() {
       els.progressBar.value = 80 + Math.round(metadata.percent * 0.2);
     });
     els.progressBar.value = 100;
+    state.zipStale = false;
     els.downloadZipBtn.disabled = false;
-    const warningText = state.fontWarnings.length ? ` Aviso: ${state.fontWarnings.join(" ")}` : "";
-    setGenerationStatus(`ZIP listo con ${state.rows.length} certificado(s).${warningText}`, Boolean(state.fontWarnings.length));
+    const warnings = [...state.fontWarnings, ...state.layoutWarnings];
+    const warningText = warnings.length ? ` Aviso: ${warnings.join(" ")}` : "";
+    setGenerationStatus(`ZIP listo con ${state.rows.length} certificado(s).${warningText}`, Boolean(warnings.length));
   } catch (error) {
     console.error(error);
     setGenerationStatus("Ocurrió un error al generar los certificados.", true);
@@ -592,7 +821,16 @@ async function createPdfForRecord(record) {
   const pdf = new jsPDF({ orientation, unit: "px", format: [width, height], compress: true });
   pdf.addImage(state.templateDataUrl, "PNG", 0, 0, width, height);
   registerFontsInPdf(pdf);
-  CERTIFICATE_FIELDS.forEach((field) => addFieldToPdf(pdf, field.key, record));
+  let yOffset = 0;
+  CERTIFICATE_FIELDS.forEach((field) => {
+    const originalY = state.config.fields[field.key].y;
+    const yOverride = field.key === "nombre_completo" ? originalY : originalY + yOffset;
+    const result = addFieldToPdf(pdf, field.key, record, { yOverride });
+    if (field.key === "nombre_completo" && result?.bottom) {
+      const nextFieldY = state.config.fields.texto_certificado.y;
+      yOffset = Math.max(yOffset, result.bottom + 18 - nextFieldY, 0);
+    }
+  });
   return pdf.output("blob");
 }
 
@@ -612,32 +850,76 @@ function registerFontsInPdf(pdf) {
   });
 }
 
-function addFieldToPdf(pdf, key, record) {
-  const config = state.config.fields[key];
-  if (!config.visible) return;
-  const text = getFieldText(key, record);
-  if (!text) return;
-  const displayText = config.uppercase ? text.toUpperCase() : text;
+function addFieldToPdf(pdf, key, record, { yOverride = null } = {}) {
+  const config = { ...state.config.fields[key] };
+  if (!config.visible) return null;
+  if (yOverride !== null) config.y = yOverride;
+  const rawText = getFieldText(key, record);
+  if (!rawText) return null;
   const font = getFontById(config.fontId);
-  const fontStyle = key === "nombre_completo" ? "bold" : "normal";
-  const fontName = getPdfFontName(font);
+  const layout = layoutPdfField(pdf, key, rawText, config, font);
+  const lineHeight = layout.size * 1.18;
 
+  layout.lines.forEach((line, lineIndex) => {
+    let currentX = alignedStartX(config.x, line.width, config.align);
+    const y = config.y + lineIndex * lineHeight;
+    line.segments.forEach((segment) => {
+      const bold = segment.bold || key === "nombre_completo";
+      setPdfFont(pdf, font, bold);
+      pdf.setFontSize(layout.size);
+      pdf.setTextColor(config.color);
+      pdf.text(segment.text, currentX, y, { baseline: "top" });
+      currentX += pdf.getTextWidth ? pdf.getTextWidth(segment.text) : segment.text.length * layout.size * 0.5;
+    });
+  });
+
+  if (layout.warning) addLayoutWarning(layout.warning);
+  return { bottom: config.y + layout.height, height: layout.height, lines: layout.lines, warning: layout.warning };
+}
+
+function layoutPdfField(pdf, key, rawText, config, font) {
+  const segments = parseRichText(rawText, config.uppercase);
+  const baseSize = Number(config.size || 16);
+  const minSize = Math.min(baseSize, Number(config.minSize || baseSize));
+  const maxLines = Math.max(1, Number(config.maxLines || 99));
+  const mode = config.overflowMode || (config.autoFit ? "shrink-wrap" : "wrap");
+  const measure = (text, bold, size) => {
+    setPdfFont(pdf, font, bold || key === "nombre_completo");
+    pdf.setFontSize(size);
+    return pdf.getTextWidth ? pdf.getTextWidth(text) : text.length * size * 0.5;
+  };
+
+  if (config.autoFit && mode.includes("shrink")) {
+    for (let size = baseSize; size >= minSize; size -= 1) {
+      const oneLine = buildRichLines(segments, (text, bold) => measure(text, bold, size), config.maxWidth, 1);
+      if (!oneLine.truncated && oneLine.lines.length <= 1) return pdfLayoutResult(oneLine.lines, size);
+    }
+  }
+
+  const wrapSize = config.autoFit && mode === "shrink-wrap" ? minSize : baseSize;
+  const wrapped = buildRichLines(segments, (text, bold) => measure(text, bold, wrapSize), config.maxWidth, mode === "shrink" ? 1 : maxLines);
+  const result = pdfLayoutResult(wrapped.lines, wrapSize);
+  if (wrapped.truncated && key === "nombre_completo") {
+    result.warning = "El nombre es demasiado largo para el espacio disponible. Reduce tamaño o aumenta ancho máximo.";
+  }
+  return result;
+}
+
+function pdfLayoutResult(lines, size) {
+  const lineHeight = size * 1.18;
+  return { lines, size, height: Math.max(lineHeight, lines.length * lineHeight), warning: "" };
+}
+
+function setPdfFont(pdf, font, bold = false) {
+  const fontName = getPdfFontName(font);
+  const style = bold ? "bold" : "normal";
   try {
-    pdf.setFont(fontName, fontStyle);
+    pdf.setFont(fontName, style);
   } catch (error) {
     console.warn(`No se pudo aplicar la fuente ${font.label}; se usará Helvetica`, error);
     addFontWarning(`La fuente “${font.label}” no se pudo aplicar y se usó Helvetica.`);
-    pdf.setFont("helvetica", fontStyle);
+    pdf.setFont("helvetica", style);
   }
-
-  pdf.setFontSize(config.size);
-  pdf.setTextColor(config.color);
-
-  const lines = pdf.splitTextToSize(displayText, config.maxWidth);
-  const lineHeight = config.size * 1.15;
-  lines.forEach((line, index) => {
-    pdf.text(line, config.x, config.y + index * lineHeight, { align: config.align, baseline: "top" });
-  });
 }
 
 function getPdfFontName(font) {
@@ -667,6 +949,7 @@ function validateBeforeGenerate() {
 
 function downloadZip() {
   if (!state.zipBlob) return;
+  if (state.zipStale) setGenerationStatus("Descargando el último ZIP generado. Hay cambios pendientes; genera nuevamente para actualizarlo.", true);
   saveAs(state.zipBlob, `certificados-creamas-${new Date().toISOString().slice(0, 10)}.zip`);
 }
 

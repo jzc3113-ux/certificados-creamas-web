@@ -56,6 +56,7 @@ Si el Excel tiene una sola hoja, la app la usa automáticamente. Si tiene varias
 10. Opcionalmente, guarda la configuración en el navegador o descárgala como JSON para reutilizarla.
 11. Genera los certificados.
 12. Descarga el ZIP con todos los PDFs.
+13. Si corriges una posición, color, tamaño, fuente o ancho después de generar, la app marca el ZIP anterior como desactualizado y puedes generar un nuevo ZIP sin refrescar la página.
 
 ## Fuentes
 
@@ -77,6 +78,20 @@ Campos con selector de fuente:
 - `codigo_certificado`
 
 Si una fuente falla al previsualizarse o al generarse en PDF, la app muestra un aviso claro, usa una fuente de respaldo y continúa la generación.
+
+## Vista previa, regeneración y lotes
+
+- **Ver vista previa en grande** abre un modal con fondo oscuro, el certificado centrado, navegación entre registros y scroll cuando el diseño no entra completo en pantalla.
+- **Generar vista previa** actualiza la vista pequeña y la vista grande si está abierta.
+- Después de generar un ZIP, puedes seguir moviendo campos o cambiando estilos. Si haces cambios, el ZIP queda marcado como desactualizado y debes generar certificados otra vez para obtener un ZIP actualizado.
+- **Nuevo lote** limpia certificados generados, ZIP anterior, mensajes e índice de vista previa, pero conserva plantilla PNG, fuentes y configuración de campos para cargar otro Excel similar.
+- **Reiniciar todo** limpia Excel, PNG, fuentes, JSON, configuración, vista previa y ZIP después de confirmar la acción.
+
+## Nombres largos y negritas
+
+El campo `nombre_completo` tiene autoajuste por defecto: reduce el tamaño hasta el mínimo configurado y, si aún no entra, parte el texto en máximo dos líneas. Si el nombre sigue siendo demasiado largo para el ancho disponible, la app muestra una advertencia para reducir tamaño o aumentar ancho máximo. Este comportamiento se aplica en la vista previa pequeña, la vista previa grande y el PDF.
+
+Para poner una parte del texto en negrita, escribe el texto entre doble asterisco en el Excel. Ejemplo: `Por su participación en **Potencia tu perfil profesional**`. Esto funciona en textos largos como `texto_certificado` y `texto_gracias`, respeta saltos de línea reales y también secuencias `\n` escritas dentro de la celda.
 
 ## Configuración JSON
 
