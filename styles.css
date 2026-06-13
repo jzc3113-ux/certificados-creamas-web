@@ -484,3 +484,46 @@ button.danger {
 .large-preview-wrap {
   max-height: 78vh;
 }
+
+.site-credit {
+  max-width: 1280px;
+  margin: -1rem auto 2.5rem;
+  padding: 0 1.5rem;
+  color: rgba(105, 115, 134, 0.9);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.site-credit strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.download-modal-card {
+  display: grid;
+  gap: 1rem;
+  width: min(92vw, 620px);
+  padding: 1.25rem;
+  border-radius: 1.4rem;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.download-message {
+  display: grid;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.download-message p {
+  margin: 0;
+}
+
+.download-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}

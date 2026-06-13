@@ -120,6 +120,10 @@
       </section>
     </main>
 
+    <footer class="site-credit" aria-label="Crédito de autoría">
+      Herramienta diseñada y automatizada por <strong>Josué Cabrera</strong> para Crea+.
+    </footer>
+
     <div id="previewModal" class="preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="largePreviewTitle">
       <div class="preview-modal-card">
         <div class="preview-modal-header">
@@ -137,6 +141,27 @@
         </div>
         <div class="large-preview-wrap">
           <canvas id="largePreviewCanvas" width="1200" height="850" aria-label="Vista previa ampliada del certificado"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div id="downloadModal" class="preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="downloadModalTitle">
+      <div class="download-modal-card">
+        <div class="preview-modal-header">
+          <div>
+            <p class="eyebrow">Proceso completado</p>
+            <h2 id="downloadModalTitle">Descarga lista</h2>
+          </div>
+          <button id="closeDownloadModalBtn" class="modal-close" type="button" aria-label="Cerrar confirmación de descarga">×</button>
+        </div>
+        <div class="download-message">
+          <p>Tu ZIP fue generado correctamente.</p>
+          <p>Esta herramienta fue diseñada y automatizada por Josué Cabrera para que el equipo pueda crear certificados de forma más rápida, ordenada y sin procesos manuales.</p>
+          <p>Gracias por usarla.</p>
+        </div>
+        <div class="download-modal-actions">
+          <button id="dismissDownloadModalBtn" class="secondary" type="button">Cerrar</button>
+          <button id="downloadNewBatchBtn" type="button">Generar nuevo lote</button>
         </div>
       </div>
     </div>

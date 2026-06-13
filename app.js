@@ -109,6 +109,10 @@ function cacheElements() {
     prevRecordBtn: document.getElementById("prevRecordBtn"),
     nextRecordBtn: document.getElementById("nextRecordBtn"),
     recordIndicator: document.getElementById("recordIndicator"),
+    downloadModal: document.getElementById("downloadModal"),
+    closeDownloadModalBtn: document.getElementById("closeDownloadModalBtn"),
+    dismissDownloadModalBtn: document.getElementById("dismissDownloadModalBtn"),
+    downloadNewBatchBtn: document.getElementById("downloadNewBatchBtn"),
   });
 }
 
@@ -129,6 +133,15 @@ function bindEvents() {
   els.largeNextRecordBtn.addEventListener("click", () => moveRecord(1));
   els.previewModal.addEventListener("click", (event) => {
     if (event.target === els.previewModal) closeLargePreview();
+  });
+  els.downloadModal.addEventListener("click", (event) => {
+    if (event.target === els.downloadModal) closeDownloadModal();
+  });
+  els.closeDownloadModalBtn.addEventListener("click", closeDownloadModal);
+  els.dismissDownloadModalBtn.addEventListener("click", closeDownloadModal);
+  els.downloadNewBatchBtn.addEventListener("click", () => {
+    closeDownloadModal();
+    startNewBatch();
   });
   els.saveConfigBtn.addEventListener("click", saveConfigToBrowser);
   els.downloadConfigBtn.addEventListener("click", downloadConfigJson);
@@ -176,6 +189,7 @@ function startNewBatch() {
   renderMappingControls();
   drawPreview();
   closeLargePreview();
+  closeDownloadModal();
   updateStatus();
   setGenerationStatus("Nuevo lote listo. Se conservaron plantilla, fuentes, posiciones y estilos; sube otro Excel para generar un nuevo ZIP.");
 }
@@ -217,6 +231,7 @@ function resetAll() {
   renderFieldTabs();
   renderFieldEditor();
   closeLargePreview();
+  closeDownloadModal();
   clearGeneratedArtifacts({ keepMessage: true });
   drawPreview();
   updateStatus();
@@ -566,7 +581,17 @@ function openLargePreview() {
 
 function closeLargePreview() {
   els.previewModal.hidden = true;
-  document.body.classList.remove("modal-open");
+  if (els.downloadModal?.hidden !== false) document.body.classList.remove("modal-open");
+}
+
+function openDownloadModal() {
+  els.downloadModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeDownloadModal() {
+  els.downloadModal.hidden = true;
+  if (els.previewModal?.hidden !== false) document.body.classList.remove("modal-open");
 }
 
 function drawPlaceholderTemplate(ctx, width, height) {
@@ -887,6 +912,7 @@ function downloadZip() {
   if (!state.zipBlob) return;
   if (state.zipStale) setGenerationStatus("Descargando el último ZIP generado. Hay cambios pendientes; genera nuevamente para actualizarlo.", true);
   saveAs(state.zipBlob, `certificados-creamas-${new Date().toISOString().slice(0, 10)}.zip`);
+  openDownloadModal();
 }
 
 function saveConfigToBrowser() {
